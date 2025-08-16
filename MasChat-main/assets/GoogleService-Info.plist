@@ -1,0 +1,34 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+	<key>CLIENT_ID</key>
+	<string>797894122462-ae1ib6b7o33hrf6pk41h5oohshglt8ng.apps.googleusercontent.com</string>
+	<key>REVERSED_CLIENT_ID</key>
+	<string>com.googleusercontent.apps.797894122462-ae1ib6b7o33hrf6pk41h5oohshglt8ng</string>
+	<key>API_KEY</key>
+	<string>AIzaSyCBQv23ajW4DI8yf-0g1DaX1yYq_s-5RQg</string>
+	<key>GCM_SENDER_ID</key>
+	<string>797894122462</string>
+	<key>PLIST_VERSION</key>
+	<string>1</string>
+	<key>BUNDLE_ID</key>
+	<string>com.MasChat.MasChat</string>
+	<key>PROJECT_ID</key>
+	<string>maschat-40238</string>
+	<key>STORAGE_BUCKET</key>
+	<string>maschat-40238.firebasestorage.app</string>
+	<key>IS_ADS_ENABLED</key>
+	<false></false>
+	<key>IS_ANALYTICS_ENABLED</key>
+	<false></false>
+	<key>IS_APPINVITE_ENABLED</key>
+	<true></true>
+	<key>IS_GCM_ENABLED</key>
+	<true></true>
+	<key>IS_SIGNIN_ENABLED</key>
+	<true></true>
+	<key>GOOGLE_APP_ID</key>
+	<string>1:797894122462:ios:93e41a016cd4d6bee21b4f</string>
+</dict>
+</plist>

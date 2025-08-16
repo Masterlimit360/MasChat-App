@@ -1,0 +1,209 @@
+# Mass Coin (MASS) Token Documentation for MasChat
+
+## 1. Token Overview
+**Token Name**: Mass Coin  
+**Symbol**: MASS  
+**Blockchain**: Polygon (for low gas fees and Ethereum compatibility)  
+**Token Standard**: ERC-20  
+**Total Supply**: 1,000,000,000 MASS  
+**Decimal Places**: 18  
+**Token Type**: Utility Token  
+
+### Distribution:
+- 40% User rewards ecosystem
+- 25% Platform development fund
+- 15% Team (4-year vesting)
+- 10% Liquidity pool
+- 10% Marketing/Airdrops
+
+## 2. Core Utilities in MasChat
+
+### a) Social Transactions:
+- **Peer-to-Peer Transfers**: Send MASS directly in chat
+- **Content Tipping**: Reward creators with MASS
+- **Gift Sending**: Purchase virtual gifts for friends
+
+### b) Commerce Features:
+- **Digital Marketplace**: Buy stickers, filters, and premium content
+- **Premium Subscriptions**: Pay for MasChat Pro with MASS
+- **Ad-Free Experience**: Redeem MASS for ad removal
+
+### c) App Governance:
+- Voting on new features
+- Content moderation proposals
+- Treasury fund allocation
+
+## 3. Technical Implementation
+
+### Smart Contract Essentials:
+```solidity
+// SPDX-License-Identifier: MIT
+pragma solidity ^0.8.0;
+
+contract MassCoin is ERC20, Ownable {
+    address public masChatTreasury;
+    uint256 public constant MAX_SUPPLY = 1e9 * 1e18;
+    
+    constructor() ERC20("Mass Coin", "MASS") {
+        _mint(msg.sender, MAX_SUPPLY);
+        masChatTreasury = msg.sender;
+    }
+    
+    function appTransfer(address sender, address recipient, uint256 amount) external {
+        require(msg.sender == masChatTreasury, "Unauthorized");
+        _transfer(sender, recipient, amount);
+    }
+}
+```
+
+### System Architecture:
+```
+Frontend (React) 
+  │
+  ├── Wallet SDK (Web3Modal) 
+  │   ├── MetaMask
+  │   ├── WalletConnect
+  │   └── MasChat Custodial Wallet
+  │
+  └── Backend (Node.js + Express OR current backend)
+        ├── User Service
+        ├── Transaction Service
+        │    ├── On-chain tx processor
+        │    └── Off-chain ledger (for microtransactions)
+        └── Marketplace Service
+             ├── Product Catalog
+             └── Order Fulfillment
+```
+
+## 4. User Flows
+
+### Sending MASS in Chat:
+1. User opens chat with recipient
+2. Clicks "Send MASS" button
+3. Enters amount (with USD equivalent shown)
+4. Selects transfer speed (affects gas fee)
+5. Confirms transaction in wallet
+6. Recipient receives notification and chat message
+
+### Purchasing Digital Goods:
+1. User browses marketplace
+2. Selects item (e.g., premium sticker pack)
+3. Clicks "Buy with MASS"
+4. System calculates cost in MASS
+5. After confirmation, item unlocks immediately
+
+## 5. Economic Model
+
+### Value Accrual:
+- **Burn Mechanism**: 2% of marketplace transactions burned
+- **Buyback Pool**: 30% of premium subscription revenue used for MASS buybacks
+- **Staking Rewards**: Users earn 5-15% APY for staking MASS
+
+### Exchange Integration:
+1. Initial DEX Listing (Uniswap/PancakeSwap)
+2. Centralized Exchange partnerships
+3. In-app swap feature (MASS ↔ USDC)
+
+## 6. Security Measures
+
+### User Protection:
+- **Custodial Option**: Simplified wallets for new users
+- **Transaction Limits**: Daily send limits based on account tier
+- **Multi-sig Treasury**: 3/5 signers required for treasury access
+
+### Smart Contract Safeguards:
+- Time-locked admin functions
+- Circuit breaker pattern for emergency pauses
+- Regular third-party audits
+
+## 7. Regulatory Compliance
+
+### Implementation:
+- KYC verification for fiat on-ramps
+- Transaction monitoring system
+- Geo-blocking for restricted jurisdictions
+- Wallet activity reporting above threshold
+
+## 8. Integration Points in MasChat UI
+
+| Feature Location        | MASS Integration                           |
+|-------------------------|--------------------------------------------|
+| Navigation Bar          | Wallet balance display                     |
+| Chat Input Box          | "Send MASS" button                         |
+| Profile Page            | MASS balance, staking dashboard            |
+| Marketplace Tab         | All items priced in MASS                   |
+| Post Context Menu       | "Tip Creator" option                       |
+| Settings Page           | Wallet management, transaction history     |
+
+## 9. Developer Roadmap
+
+### Phase 1: Core Implementation (2 months)
+- Smart contract deployment
+- In-app wallet integration
+- Basic P2P transfers
+- Initial reward distribution
+
+### Phase 2: Commerce Features (1 month)
+- Digital marketplace
+- Premium subscriptions
+- Staking module
+
+### Phase 3: Advanced Features (1.5 months)
+- Governance portal
+- Cross-chain bridge
+- Fiat on-ramp integration
+
+## 10. Sample Transaction Flow Diagram
+```
+User A (Sender)           MasChat Backend          Blockchain
+     │                         │                       │
+     │ Initiate Transfer       │                       │
+     ├─────────────────────────>                       │
+     │                         │ Verify Balance        │
+     │                         ├───────────────────────>
+     │                         │                       │
+     │                         │ Return Gas Estimate   │
+     │ Approve Transaction     <───────────────────────┤
+     ├─────────────────────────>                       │
+     │                         │ Sign & Broadcast Tx   │
+     │                         ├───────────────────────>
+     │                         │                       │
+     │ Transaction Completed   │ Update DB Records     │
+     <─────────────────────────┤                       │
+     │                         │ Push Notification     │
+     │                         ├───> User B (Recipient)│
+```
+
+## 11. Frequently Asked Questions
+
+**Q: How do users acquire MASS initially?**  
+A: Through:
+- Social rewards (posting, engagement)
+- Purchasing in-app via credit card/crypto
+- External exchanges
+- Referral bonuses
+
+**Q: What prevents spam with microtransactions?**  
+A: We implement:
+- Minimum transaction thresholds
+- Gas cost absorption for small transfers
+- Batch transaction processing
+
+**Q: How are exchange rates determined?**  
+A: Through:
+- Primary DEX pool pricing
+- Chainlink price oracles
+- Volume-weighted average pricing
+
+**Q: Can users withdraw to external wallets?**  
+A: Yes, full ERC-20 compatibility allows transfers to any Polygon address.
+
+## 12. Conclusion
+
+Mass Coin transforms MasChat from a communication platform into a comprehensive social economy. By integrating MASS at every interaction point, we create a vibrant ecosystem where:
+- Users are rewarded for engagement
+- Value accrues to active participants
+- Social interactions gain financial utility
+- The platform grows through token incentives
+
+For implementation, we recommend starting with a testnet deployment and phased feature rollout to ensure smooth adoption. Consider partnering with Web3 infrastructure providers like Alchemy or Infura for reliable node access.
