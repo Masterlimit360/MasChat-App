@@ -1,434 +1,419 @@
 import client from '../../api/client';
+import web3Service from './web3Service';
 
 export interface WalletInfo {
   id: number;
   userId: number;
-  walletAddress: string;
+  address: string;
   balance: number;
-  stakedAmount: number;
-  totalEarned: number;
-  totalSpent: number;
-  walletType: string;
   isActive: boolean;
-  lastSyncAt: string;
   createdAt: string;
   updatedAt: string;
 }
 
-export interface TransferRequest {
+export interface TransactionInfo {
+  id: number;
+  senderId: number;
   recipientId: number;
   amount: number;
-  message?: string;
-  contextType: 'POST' | 'REEL' | 'CHAT' | 'DIRECT' | 'MASS_COIN_SECTION';
-  contextId?: string;
-  transactionType?: 'P2P_TRANSFER' | 'CONTENT_TIP' | 'GIFT_PURCHASE' | 'MARKETPLACE_PURCHASE' | 'SUBSCRIPTION_PAYMENT' | 'REWARD_DISTRIBUTION' | 'STAKING_REWARD' | 'AIRDROP';
+  transactionType: string;
+  status: string;
+  transactionHash?: string;
+  createdAt: string;
+  updatedAt: string;
 }
 
 export interface TransferRequestInfo {
   id: number;
   senderId: number;
-  senderName: string;
-  senderAvatar?: string;
   recipientId: number;
-  recipientName: string;
-  recipientAvatar?: string;
   amount: number;
-  message?: string;
-  contextType: string;
-  contextId?: string;
-  status: 'PENDING' | 'APPROVED' | 'REJECTED' | 'EXPIRED' | 'CANCELLED';
-  createdAt: string;
-  expiresAt: string;
-}
-
-export interface TransactionInfo {
-  id: number;
-  senderId?: number;
-  senderName: string;
-  senderAvatar?: string;
-  recipientId: number;
-  recipientName: string;
-  recipientAvatar?: string;
-  amount: number;
-  transactionHash?: string;
-  transactionType: string;
   status: string;
-  gasFee?: number;
-  usdValue?: number;
-  description?: string;
   createdAt: string;
+  updatedAt: string;
 }
 
 export interface UserStats {
+  totalSent: number;
+  totalReceived: number;
   totalTransactions: number;
-  totalVolume: number;
   averageTransactionAmount: number;
-  totalTipsReceived: number;
-  totalTipsAmount: number;
-  totalTipsSent: number;
-  totalTipsSentAmount: number;
-}
-
-export interface UserSearchResult {
-  id: number;
-  username: string;
-  fullName: string;
-  profilePicture?: string;
-  email: string;
-}
-
-export interface PlatformStats {
-  totalUsers: number;
-  totalWallets: number;
-  totalCirculatingSupply: number;
-  totalStakedAmount: number;
-  totalTransactions: number;
-  totalTransactionVolume: number;
-}
-
-export interface WithdrawalRequest {
-  userId: number;
-  amount: number;
-  method: 'BANK' | 'MOBILE_MONEY' | 'P2P';
-  destination: string;
-  metadata?: string; // optional JSON
 }
 
 export interface WithdrawalInfo {
   id: number;
   userId: number;
   amount: number;
-  method: string;
-  destination: string;
-  status: 'PENDING' | 'PROCESSING' | 'COMPLETED' | 'FAILED';
+  status: string;
+  transactionHash?: string;
   createdAt: string;
-  updatedAt?: string;
+  updatedAt: string;
 }
 
 class MassCoinService {
-  // Wallet operations
+  private useBlockchain: boolean = true; // Toggle between blockchain and centralized
+
+  // Get wallet information
   async getWallet(userId: number): Promise<WalletInfo> {
     try {
-      const response = await client.get(`/masscoin/wallet?userId=${userId}`);
-      return response.data;
-    } catch (error: any) {
-      // Don't log 404 errors to console to reduce noise
-      if (error.response?.status === 404) {
-        return this.getMockWallet();
+      if (this.useBlockchain) {
+        // Use blockchain
+        const address = await web3Service.getWalletAddress();
+        const balance = await web3Service.getBalance(address || undefined);
+        
+        return {
+          id: userId,
+          userId: userId,
+          address: address || '0x0000000000000000000000000000000000000000',
+          balance: parseFloat(balance),
+          isActive: true,
+          createdAt: new Date().toISOString(),
+          updatedAt: new Date().toISOString()
+        };
+      } else {
+        // Use centralized backend
+        const response = await client.get(`/api/masscoin/wallet/${userId}`);
+        return response.data;
       }
-      // Only log other errors
-      console.error('Error fetching wallet:', error);
+    } catch (error) {
+      console.error('Failed to get wallet:', error);
       return this.getMockWallet();
     }
   }
 
-  async updateWalletAddress(userId: number, address: string): Promise<WalletInfo> {
+  // Get user transactions
+  async getUserTransactions(userId: number, page: number = 0, size: number = 10): Promise<TransactionInfo[]> {
     try {
-      const response = await client.post(`/masscoin/wallet/address?userId=${userId}`, {
-        address: address
-      });
-      return response.data;
+      if (this.useBlockchain) {
+        // For blockchain, we'll return mock data for now
+        // In a real implementation, you'd query blockchain events
+        return this.getMockTransactions();
+      } else {
+        // Use centralized backend
+        const response = await client.get(`/api/masscoin/transactions/${userId}?page=${page}&size=${size}`);
+        return response.data;
+      }
     } catch (error) {
-      console.error('Error updating wallet address:', error);
-      throw error;
+      console.error('Failed to get transactions:', error);
+      return this.getMockTransactions();
     }
   }
 
-  // Transfer request operations
-  async createTransferRequest(senderId: number, request: TransferRequest): Promise<TransferRequestInfo> {
+  // Get user stats
+  async getUserStats(userId: number): Promise<UserStats> {
     try {
-      const response = await client.post(`/masscoin/transfer-request?senderId=${senderId}`, request);
-      return response.data;
+      if (this.useBlockchain) {
+        // For blockchain, calculate from transactions
+        const transactions = await this.getUserTransactions(userId);
+        const sent = transactions.filter(t => t.transactionType === 'SEND').reduce((sum, t) => sum + t.amount, 0);
+        const received = transactions.filter(t => t.transactionType === 'RECEIVE').reduce((sum, t) => sum + t.amount, 0);
+        
+        return {
+          totalSent: sent,
+          totalReceived: received,
+          totalTransactions: transactions.length,
+          averageTransactionAmount: transactions.length > 0 ? (sent + received) / transactions.length : 0
+        };
+      } else {
+        // Use centralized backend
+        const response = await client.get(`/api/masscoin/stats/${userId}`);
+        return response.data;
+      }
     } catch (error) {
-      console.error('Error creating transfer request:', error);
-      throw error;
+      console.error('Failed to get user stats:', error);
+      return {
+        totalSent: 0,
+        totalReceived: 0,
+        totalTransactions: 0,
+        averageTransactionAmount: 0
+      };
     }
   }
 
-  async approveTransferRequest(requestId: number, recipientId: number): Promise<TransactionInfo> {
+  // Get withdrawals
+  async getWithdrawals(userId: number): Promise<WithdrawalInfo[]> {
     try {
-      const response = await client.post(`/masscoin/transfer-request/${requestId}/approve?recipientId=${recipientId}`);
-      return response.data;
+      if (this.useBlockchain) {
+        // For blockchain, return mock data
+        return [];
+      } else {
+        // Use centralized backend
+        const response = await client.get(`/api/masscoin/withdrawals/${userId}`);
+        return response.data;
+      }
     } catch (error) {
-      console.error('Error approving transfer request:', error);
-      throw error;
+      console.error('Failed to get withdrawals:', error);
+      return [];
     }
   }
 
-  async rejectTransferRequest(requestId: number, recipientId: number): Promise<void> {
+  // Transfer MassCoin
+  async transferMass(senderId: number, transferRequest: any): Promise<boolean> {
     try {
-      await client.post(`/masscoin/transfer-request/${requestId}/reject?recipientId=${recipientId}`);
+      if (this.useBlockchain) {
+        // Use blockchain transfer
+        const success = await web3Service.transfer(
+          transferRequest.recipientAddress,
+          transferRequest.amount.toString()
+        );
+        
+        if (success) {
+          // Also update backend for record keeping
+          await client.post('/api/masscoin/transfer', {
+            senderId,
+            recipientId: transferRequest.recipientId,
+            amount: transferRequest.amount,
+            transactionType: 'SEND',
+            status: 'COMPLETED',
+            transactionHash: 'blockchain_tx_' + Date.now() // Mock hash
+          });
+        }
+        
+        return success;
+      } else {
+        // Use centralized backend
+        const response = await client.post('/api/masscoin/transfer', {
+          senderId,
+          recipientId: transferRequest.recipientId,
+          amount: transferRequest.amount,
+          transactionType: 'SEND',
+          status: 'PENDING'
+        });
+        return response.status === 200;
+      }
     } catch (error) {
-      console.error('Error rejecting transfer request:', error);
-      throw error;
+      console.error('Transfer failed:', error);
+      return false;
+    }
+  }
+
+  // Tip creator
+  async tipCreator(senderId: number, creatorId: number, amount: number): Promise<boolean> {
+    try {
+      if (this.useBlockchain) {
+        // For tipping, we'll use the centralized system for now
+        // as it requires user lookup
+        const response = await client.post('/api/masscoin/tip', {
+          senderId,
+          creatorId,
+          amount,
+          transactionType: 'TIP',
+          status: 'COMPLETED'
+        });
+        return response.status === 200;
+      } else {
+        // Use centralized backend
+        const response = await client.post('/api/masscoin/tip', {
+          senderId,
+          creatorId,
+          amount,
+          transactionType: 'TIP',
+          status: 'COMPLETED'
+        });
+        return response.status === 200;
+      }
+    } catch (error) {
+      console.error('Tip failed:', error);
+      return false;
+    }
+  }
+
+  // Request withdrawal
+  async requestWithdrawal(withdrawalRequest: any): Promise<boolean> {
+    try {
+      if (this.useBlockchain) {
+        // For blockchain, this would trigger a smart contract call
+        // For now, we'll use the centralized system
+        const response = await client.post('/api/masscoin/withdrawal', withdrawalRequest);
+        return response.status === 200;
+      } else {
+        // Use centralized backend
+        const response = await client.post('/api/masscoin/withdrawal', withdrawalRequest);
+        return response.status === 200;
+      }
+    } catch (error) {
+      console.error('Withdrawal request failed:', error);
+      return false;
+    }
+  }
+
+  // Approve transfer request
+  async approveTransferRequest(requestId: number, userId: number): Promise<boolean> {
+    try {
+      if (this.useBlockchain) {
+        // For blockchain, this would be handled differently
+        // For now, use centralized system
+        const response = await client.put(`/api/masscoin/transfer-requests/${requestId}/approve`, { userId });
+        return response.status === 200;
+      } else {
+        // Use centralized backend
+        const response = await client.put(`/api/masscoin/transfer-requests/${requestId}/approve`, { userId });
+        return response.status === 200;
+      }
+    } catch (error) {
+      console.error('Approve transfer request failed:', error);
+      return false;
+    }
+  }
+
+  // Reject transfer request
+  async rejectTransferRequest(requestId: number, userId: number): Promise<boolean> {
+    try {
+      if (this.useBlockchain) {
+        // For blockchain, this would be handled differently
+        // For now, use centralized system
+        const response = await client.put(`/api/masscoin/transfer-requests/${requestId}/reject`, { userId });
+        return response.status === 200;
+      } else {
+        // Use centralized backend
+        const response = await client.put(`/api/masscoin/transfer-requests/${requestId}/reject`, { userId });
+        return response.status === 200;
+      }
+    } catch (error) {
+      console.error('Reject transfer request failed:', error);
+      return false;
     }
   }
 
   // Get transfer requests
   async getTransferRequests(userId: number): Promise<TransferRequestInfo[]> {
     try {
-      const response = await client.get(`/masscoin/transfer-requests?userId=${userId}`);
-      return response.data;
-    } catch (error: any) {
-      // Don't log 404 errors to console to reduce noise
-      if (error.response?.status === 404) {
+      if (this.useBlockchain) {
+        // For blockchain, return mock data for now
         return [];
+      } else {
+        // Use centralized backend
+        const response = await client.get(`/api/masscoin/transfer-requests/${userId}`);
+        return response.data;
       }
-      // Only log other errors
-      console.error('Error fetching transfer requests:', error);
+    } catch (error) {
+      console.error('Failed to get transfer requests:', error);
       return [];
     }
   }
 
-  async getPendingTransferRequestsCount(userId: number): Promise<number> {
+  // Connect wallet
+  async connectWallet(): Promise<string | null> {
     try {
-      const response = await client.get(`/masscoin/transfer-requests/pending-count?userId=${userId}`);
-      return response.data.count;
-    } catch (error) {
-      console.error('Error fetching pending transfer requests count:', error);
-      throw error;
-    }
-  }
-
-  // Direct transfer operations
-  async transferMass(senderId: number, request: TransferRequest): Promise<TransactionInfo> {
-    try {
-      const response = await client.post(`/masscoin/transfer?senderId=${senderId}`, request);
-      return response.data;
-    } catch (error) {
-      console.error('Error transferring mass coins:', error);
-      throw error;
-    }
-  }
-
-  // Tip operations
-  async tipCreator(senderId: number, postId: string, amount: number, description?: string): Promise<TransactionInfo> {
-    try {
-      console.log('Tipping creator with params:', { senderId, postId, amount, description });
-      
-      // Send as request parameters, not query parameters
-      const response = await client.post('/masscoin/tip', null, {
-        params: {
-          senderId: senderId.toString(),
-          postId: postId,
-          amount: amount.toString(),
-          ...(description && { description })
-        }
-      });
-      
-      console.log('Tip response:', response.data);
-      return response.data;
-    } catch (error: any) {
-      console.error('Error tipping creator:', error);
-      console.error('Error response:', error.response?.data);
-      console.error('Error status:', error.response?.status);
-      throw error;
-    }
-  }
-
-  // Reward operations
-  async rewardUser(userId: number, amount: number, reason: string): Promise<TransactionInfo> {
-    try {
-      const response = await client.post(`/masscoin/reward?userId=${userId}&amount=${amount}&reason=${encodeURIComponent(reason)}`);
-      return response.data;
-    } catch (error) {
-      console.error('Error rewarding user:', error);
-      throw error;
-    }
-  }
-
-  // Staking operations
-  async stakeMass(userId: number, amount: number): Promise<WalletInfo> {
-    try {
-      const response = await client.post(`/masscoin/stake?userId=${userId}&amount=${amount}`);
-      return response.data;
-    } catch (error) {
-      console.error('Error staking mass coins:', error);
-      throw error;
-    }
-  }
-
-  async unstakeMass(userId: number, amount: number): Promise<WalletInfo> {
-    try {
-      const response = await client.post(`/masscoin/unstake?userId=${userId}&amount=${amount}`);
-      return response.data;
-    } catch (error) {
-      console.error('Error unstaking mass coins:', error);
-      throw error;
-    }
-  }
-
-  // Transaction operations
-  async getUserTransactions(userId: number, page: number = 0, size: number = 10): Promise<{ content: TransactionInfo[]; last: boolean; totalElements: number }> {
-    try {
-      const response = await client.get(`/masscoin/transactions?userId=${userId}&page=${page}&size=${size}`);
-      return response.data;
-    } catch (error: any) {
-      // Don't log 404 errors to console to reduce noise
-      if (error.response?.status === 404) {
-        return {
-          content: this.getMockTransactions(),
-          last: true,
-          totalElements: 0,
-        };
+      if (this.useBlockchain) {
+        return await web3Service.connectWallet();
+      } else {
+        // For centralized system, return null
+        return null;
       }
-      // Only log other errors
-      console.error('Error fetching user transactions:', error);
-      return {
-        content: this.getMockTransactions(),
-        last: true,
-        totalElements: 0,
-      };
-    }
-  }
-
-  // Withdrawals
-  async requestWithdrawal(payload: WithdrawalRequest): Promise<WithdrawalInfo> {
-    try {
-      const response = await client.post('/masscoin/withdrawals', payload);
-      return response.data;
     } catch (error) {
-      console.error('Error requesting withdrawal:', error);
-      throw error;
+      console.error('Failed to connect wallet:', error);
+      return null;
     }
   }
 
-  async getWithdrawals(userId: number): Promise<WithdrawalInfo[]> {
+  // Check if user is registered on blockchain
+  async isUserRegistered(address?: string): Promise<boolean> {
     try {
-      const response = await client.get(`/masscoin/withdrawals?userId=${userId}`);
-      return response.data;
-    } catch (error) {
-      console.error('Error fetching withdrawals:', error);
-      throw error;
-    }
-  }
-
-  // Health check
-  async healthCheck(): Promise<{ status: string; service: string }> {
-    try {
-      const response = await client.get('/masscoin/health');
-      return response.data;
-    } catch (error) {
-      console.error('Error checking mass coin service health:', error);
-      throw error;
-    }
-  }
-
-  // User search
-  async searchUsers(query: string, currentUserId: number): Promise<UserSearchResult[]> {
-    try {
-      const response = await client.get(`/masscoin/search-users?query=${encodeURIComponent(query)}&currentUserId=${currentUserId}`);
-      return response.data;
-    } catch (error: any) {
-      // Don't log 404 errors to console to reduce noise
-      if (error.response?.status === 404) {
-        return [];
+      if (this.useBlockchain) {
+        return await web3Service.isUserRegistered(address);
+      } else {
+        return true; // Always true for centralized system
       }
-      // Only log other errors
-      console.error('Error searching users:', error);
-      return [];
+    } catch (error) {
+      console.error('Failed to check user registration:', error);
+      return false;
     }
   }
 
-  // Get user statistics
-  async getUserStats(userId: number): Promise<UserStats> {
+  // Register user on blockchain
+  async registerUser(address: string): Promise<boolean> {
     try {
-      const response = await client.get(`/masscoin/user-stats?userId=${userId}`);
-      return response.data;
-    } catch (error: any) {
-      // Don't log 404 errors to console to reduce noise
-      if (error.response?.status === 404) {
-        return {
-          totalTransactions: 0,
-          totalVolume: 0,
-          averageTransactionAmount: 0,
-          totalTipsReceived: 0,
-          totalTipsAmount: 0,
-          totalTipsSent: 0,
-          totalTipsSentAmount: 0,
-        };
+      if (this.useBlockchain) {
+        return await web3Service.registerUser(address);
+      } else {
+        return true; // Always true for centralized system
       }
-      // Log error details for debugging
-      console.error('Error fetching user stats:', error.response?.data || error.message);
-      // Return default values instead of throwing
-      return {
-        totalTransactions: 0,
-        totalVolume: 0,
-        averageTransactionAmount: 0,
-        totalTipsReceived: 0,
-        totalTipsAmount: 0,
-        totalTipsSent: 0,
-        totalTipsSentAmount: 0,
-      };
+    } catch (error) {
+      console.error('Failed to register user:', error);
+      return false;
     }
   }
 
-  // Utility methods
+  // Toggle between blockchain and centralized mode
+  setUseBlockchain(useBlockchain: boolean): void {
+    this.useBlockchain = useBlockchain;
+  }
+
+  // Get current mode
+  isUsingBlockchain(): boolean {
+    return this.useBlockchain;
+  }
+
+  // Format amount for display
   formatAmount(amount: number): string {
-    return new Intl.NumberFormat('en-US', {
-      minimumFractionDigits: 2,
-      maximumFractionDigits: 6
-    }).format(amount);
+    if (this.useBlockchain) {
+      return web3Service.formatAmount(amount.toString());
+    } else {
+      if (amount >= 1000000) {
+        return (amount / 1000000).toFixed(2) + 'M';
+      } else if (amount >= 1000) {
+        return (amount / 1000).toFixed(2) + 'K';
+      } else {
+        return amount.toFixed(2);
+      }
+    }
   }
 
+  // Format USD value
   formatUsdValue(amount: number): string {
-    // Mock USD value - in real app, this would fetch from an API
-    const usdRate = 0.01; // 1 Mass Coin = $0.01
-    const usdValue = amount * usdRate;
-    return new Intl.NumberFormat('en-US', {
-      style: 'currency',
-      currency: 'USD'
-    }).format(usdValue);
+    if (this.useBlockchain) {
+      return web3Service.formatUsdValue(amount.toString());
+    } else {
+      const usdValue = amount * 0.01; // Mock conversion rate
+      return `$${usdValue.toFixed(2)}`;
+    }
   }
 
+  // Get transaction type label
   getTransactionTypeLabel(type: string): string {
-    const labels: { [key: string]: string } = {
-      'P2P_TRANSFER': 'Peer to Peer',
-      'CONTENT_TIP': 'Content Tip',
-      'GIFT_PURCHASE': 'Gift Purchase',
-      'MARKETPLACE_PURCHASE': 'Marketplace',
-      'SUBSCRIPTION_PAYMENT': 'Subscription',
-      'REWARD_DISTRIBUTION': 'Reward',
-      'STAKING_REWARD': 'Staking Reward',
-      'AIRDROP': 'Airdrop',
-      'WITHDRAWAL': 'Withdrawal'
-    };
-    return labels[type] || type;
+    switch (type) {
+      case 'SEND': return 'Sent';
+      case 'RECEIVE': return 'Received';
+      case 'TIP': return 'Tip';
+      case 'WITHDRAWAL': return 'Withdrawal';
+      case 'STAKE': return 'Staked';
+      case 'UNSTAKE': return 'Unstaked';
+      case 'REWARD': return 'Reward';
+      default: return type;
+    }
   }
 
+  // Get status label
   getStatusLabel(status: string): string {
-    const labels: { [key: string]: string } = {
-      'PENDING': 'Pending',
-      'CONFIRMED': 'Confirmed',
-      'FAILED': 'Failed',
-      'CANCELLED': 'Cancelled'
-    };
-    return labels[status] || status;
+    switch (status) {
+      case 'PENDING': return 'Pending';
+      case 'COMPLETED': return 'Completed';
+      case 'FAILED': return 'Failed';
+      case 'CANCELLED': return 'Cancelled';
+      default: return status;
+    }
   }
 
+  // Get status color
   getStatusColor(status: string): string {
-    const colors: { [key: string]: string } = {
-      'PENDING': '#fbbf24',
-      'CONFIRMED': '#22c55e',
-      'FAILED': '#ef4444',
-      'CANCELLED': '#6b7280'
-    };
-    return colors[status] || '#6b7280';
+    switch (status) {
+      case 'PENDING': return '#FFA500';
+      case 'COMPLETED': return '#4CAF50';
+      case 'FAILED': return '#F44336';
+      case 'CANCELLED': return '#9E9E9E';
+      default: return '#9E9E9E';
+    }
   }
 
-  // Mock data for development
+  // Mock data for fallback
   getMockWallet(): WalletInfo {
     return {
       id: 1,
       userId: 1,
-      walletAddress: 'MC1234567890ABCDEF1234567890ABCDEF',
-      balance: 1000.0,
-      stakedAmount: 0.0,
-      totalEarned: 1000.0,
-      totalSpent: 0.0,
-      walletType: 'CUSTODIAL',
+      address: '0x1234567890123456789012345678901234567890',
+      balance: 1000,
       isActive: true,
-      lastSyncAt: new Date().toISOString(),
       createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString()
     };
@@ -438,18 +423,31 @@ class MassCoinService {
     return [
       {
         id: 1,
-        senderId: undefined,
-        senderName: 'System',
+        senderId: 1,
+        recipientId: 2,
+        amount: 100,
+        transactionType: 'SEND',
+        status: 'COMPLETED',
+        transactionHash: '0x1234567890abcdef',
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString()
+      },
+      {
+        id: 2,
+        senderId: 3,
         recipientId: 1,
-        recipientName: 'John Doe',
-        amount: 1000.0,
-        transactionType: 'AIRDROP',
-        status: 'CONFIRMED',
-        description: 'Welcome bonus - 1000 Mass Coins',
-        createdAt: new Date().toISOString()
+        amount: 50,
+        transactionType: 'RECEIVE',
+        status: 'COMPLETED',
+        transactionHash: '0xabcdef1234567890',
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString()
       }
     ];
   }
 }
 
-export const massCoinService = new MassCoinService(); 
+// Create singleton instance
+const massCoinService = new MassCoinService();
+
+export { massCoinService }; 
