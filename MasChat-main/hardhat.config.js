@@ -19,11 +19,11 @@ module.exports = {
       accounts: process.env.PRIVATE_KEY ? [process.env.PRIVATE_KEY] : [],
       chainId: 137,
     },
-    // Polygon Mumbai Testnet
-    mumbai: {
-      url: process.env.MUMBAI_RPC_URL || "https://rpc-mumbai.maticvigil.com",
+    // Polygon Amoy Testnet (replaces Mumbai)
+    amoy: {
+      url: process.env.AMOY_RPC_URL || "https://rpc-amoy.polygon.technology",
       accounts: process.env.PRIVATE_KEY ? [process.env.PRIVATE_KEY] : [],
-      chainId: 80001,
+      chainId: 80002,
     },
     // Local development
     hardhat: {
@@ -33,7 +33,7 @@ module.exports = {
   etherscan: {
     apiKey: {
       polygon: process.env.POLYGONSCAN_API_KEY,
-      polygonMumbai: process.env.POLYGONSCAN_API_KEY,
+      polygonAmoy: process.env.POLYGONSCAN_API_KEY,
     },
   },
   gasReporter: {

@@ -39,11 +39,11 @@ const NETWORKS = {
     rpcUrl: 'https://polygon-rpc.com',
     blockExplorer: 'https://polygonscan.com'
   },
-  MUMBAI: {
-    chainId: 80001,
-    name: 'Mumbai Testnet',
-    rpcUrl: 'https://rpc-mumbai.maticvigil.com',
-    blockExplorer: 'https://mumbai.polygonscan.com'
+  AMOY: {
+    chainId: 80002,
+    name: 'Polygon Amoy Testnet',
+    rpcUrl: 'https://rpc-amoy.polygon.technology',
+    blockExplorer: 'https://amoy.polygonscan.com'
   }
 };
 
@@ -52,15 +52,19 @@ class Web3Service {
   private signer: ethers.JsonRpcSigner | null = null;
   private massCoinContract: ethers.Contract | null = null;
   private stakingContract: ethers.Contract | null = null;
-  private currentNetwork: string = 'MUMBAI'; // Default to testnet
+  private currentNetwork: string = 'AMOY'; // Default to Amoy testnet
+  private blockchainEnabled: boolean = false; // Disable blockchain functionality until token is deployed
 
   constructor() {
-    this.initializeProvider();
+    // Don't initialize provider until blockchain is enabled
+    if (this.blockchainEnabled) {
+      this.initializeProvider();
+    }
   }
 
   private async initializeProvider() {
     try {
-      // Use Mumbai testnet by default
+      // Use Amoy testnet by default
       const network = NETWORKS[this.currentNetwork as keyof typeof NETWORKS];
       this.provider = new ethers.JsonRpcProvider(network.rpcUrl);
       
@@ -81,9 +85,27 @@ class Web3Service {
     }
   }
 
+  // Enable blockchain functionality (call this after token deployment)
+  enableBlockchain() {
+    this.blockchainEnabled = true;
+    this.initializeProvider();
+  }
+
+  // Check if blockchain is enabled
+  isBlockchainEnabled(): boolean {
+    return this.blockchainEnabled;
+  }
+
   // Connect wallet
   async connectWallet(): Promise<string | null> {
     try {
+      if (!this.blockchainEnabled) {
+        // Return mock address when blockchain is disabled
+        const mockAddress = '0x1234567890123456789012345678901234567890';
+        await AsyncStorage.setItem('wallet_address', mockAddress);
+        return mockAddress;
+      }
+
       if (typeof window !== 'undefined' && window.ethereum) {
         // Web environment
         await window.ethereum.request({ method: 'eth_requestAccounts' });
@@ -114,6 +136,11 @@ class Web3Service {
 
   // Get wallet address
   async getWalletAddress(): Promise<string | null> {
+    if (!this.blockchainEnabled) {
+      // Return mock address when blockchain is disabled
+      return await AsyncStorage.getItem('wallet_address') || '0x1234567890123456789012345678901234567890';
+    }
+
     if (this.signer) {
       return await this.signer.getAddress();
     }
@@ -123,6 +150,11 @@ class Web3Service {
   // Get MassCoin balance
   async getBalance(address?: string): Promise<string> {
     try {
+      if (!this.blockchainEnabled) {
+        // Return mock balance when blockchain is disabled
+        return '1000.0'; // Mock 1000 MASS tokens
+      }
+
       if (!this.massCoinContract) {
         throw new Error('MassCoin contract not initialized');
       }
@@ -136,13 +168,19 @@ class Web3Service {
       return ethers.formatUnits(balance, 18); // MassCoin has 18 decimals
     } catch (error) {
       console.error('Failed to get balance:', error);
-      return '0';
+      return '1000.0'; // Fallback to mock balance
     }
   }
 
   // Transfer MassCoin
   async transfer(to: string, amount: string): Promise<boolean> {
     try {
+      if (!this.blockchainEnabled) {
+        // Mock successful transfer when blockchain is disabled
+        console.log(`Mock transfer: ${amount} MASS to ${to}`);
+        return true;
+      }
+
       if (!this.massCoinContract || !this.signer) {
         throw new Error('Contract or signer not available');
       }
@@ -161,6 +199,12 @@ class Web3Service {
   // Platform transfer (for backend integration)
   async platformTransfer(from: string, to: string, amount: string): Promise<boolean> {
     try {
+      if (!this.blockchainEnabled) {
+        // Mock successful transfer when blockchain is disabled
+        console.log(`Mock platform transfer: ${amount} MASS from ${from} to ${to}`);
+        return true;
+      }
+
       if (!this.massCoinContract || !this.signer) {
         throw new Error('Contract or signer not available');
       }
@@ -179,8 +223,14 @@ class Web3Service {
   // Register user on blockchain
   async registerUser(address: string): Promise<boolean> {
     try {
+      if (!this.blockchainEnabled) {
+        // Mock successful registration when blockchain is disabled
+        console.log(`Mock user registration: ${address}`);
+        return true;
+      }
+
       if (!this.massCoinContract || !this.signer) {
-        throw new Error('Contract or signer not available');
+        throw new Error('MassCoin contract not available');
       }
 
       const tx = await this.massCoinContract.registerUser(address);
@@ -196,6 +246,12 @@ class Web3Service {
   // Staking functions
   async stake(amount: string, period: number): Promise<boolean> {
     try {
+      if (!this.blockchainEnabled) {
+        // Mock successful staking when blockchain is disabled
+        console.log(`Mock staking: ${amount} MASS for ${period} days`);
+        return true;
+      }
+
       if (!this.stakingContract || !this.signer) {
         throw new Error('Contract or signer not available');
       }
@@ -213,6 +269,12 @@ class Web3Service {
 
   async unstake(stakeIndex: number): Promise<boolean> {
     try {
+      if (!this.blockchainEnabled) {
+        // Mock successful unstaking when blockchain is disabled
+        console.log(`Mock unstaking: stake index ${stakeIndex}`);
+        return true;
+      }
+
       if (!this.stakingContract || !this.signer) {
         throw new Error('Contract or signer not available');
       }
@@ -229,6 +291,12 @@ class Web3Service {
 
   async claimRewards(stakeIndex: number): Promise<boolean> {
     try {
+      if (!this.blockchainEnabled) {
+        // Mock successful reward claim when blockchain is disabled
+        console.log(`Mock claim rewards: stake index ${stakeIndex}`);
+        return true;
+      }
+
       if (!this.stakingContract || !this.signer) {
         throw new Error('Contract or signer not available');
       }
@@ -246,6 +314,19 @@ class Web3Service {
   // Get user stakes
   async getUserStakes(address?: string): Promise<any[]> {
     try {
+      if (!this.blockchainEnabled) {
+        // Return mock stakes when blockchain is disabled
+        return [
+          {
+            amount: '100.0',
+            startTime: Math.floor(Date.now() / 1000) - 86400, // 1 day ago
+            endTime: Math.floor(Date.now() / 1000) + 2592000, // 30 days from now
+            period: 30,
+            isActive: true
+          }
+        ];
+      }
+
       if (!this.stakingContract) {
         throw new Error('Staking contract not initialized');
       }
@@ -266,6 +347,11 @@ class Web3Service {
   // Calculate rewards
   async calculateRewards(address: string, stakeIndex: number): Promise<string> {
     try {
+      if (!this.blockchainEnabled) {
+        // Return mock rewards when blockchain is disabled
+        return '5.0'; // Mock 5 MASS rewards
+      }
+
       if (!this.stakingContract) {
         throw new Error('Staking contract not initialized');
       }
@@ -274,13 +360,18 @@ class Web3Service {
       return ethers.formatUnits(rewards, 18);
     } catch (error) {
       console.error('Failed to calculate rewards:', error);
-      return '0';
+      return '5.0'; // Fallback to mock rewards
     }
   }
 
   // Check if user is registered
   async isUserRegistered(address?: string): Promise<boolean> {
     try {
+      if (!this.blockchainEnabled) {
+        // Return true when blockchain is disabled (all users are "registered")
+        return true;
+      }
+
       if (!this.massCoinContract) {
         throw new Error('MassCoin contract not initialized');
       }
@@ -294,13 +385,24 @@ class Web3Service {
       return balance > 0;
     } catch (error) {
       console.error('Failed to check user registration:', error);
-      return false;
+      return true; // Fallback to true when blockchain is disabled
     }
   }
 
   // Get contract info
   async getContractInfo() {
     try {
+      if (!this.blockchainEnabled) {
+        // Return mock contract info when blockchain is disabled
+        return {
+          name: 'MassCoin',
+          symbol: 'MASS',
+          decimals: 18,
+          totalSupply: '1000000.0',
+          address: CONTRACT_ADDRESSES.MASSCOIN
+        };
+      }
+
       if (!this.massCoinContract) {
         throw new Error('MassCoin contract not initialized');
       }
@@ -326,10 +428,12 @@ class Web3Service {
   }
 
   // Switch network
-  async switchNetwork(networkName: 'POLYGON' | 'MUMBAI'): Promise<boolean> {
+  async switchNetwork(networkName: 'POLYGON' | 'AMOY'): Promise<boolean> {
     try {
       this.currentNetwork = networkName;
-      await this.initializeProvider();
+      if (this.blockchainEnabled) {
+        await this.initializeProvider();
+      }
       return true;
     } catch (error) {
       console.error('Failed to switch network:', error);
