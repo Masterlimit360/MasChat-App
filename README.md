@@ -1,6 +1,6 @@
 # MasChat Monorepo
 
-Full‑stack social platform consisting of a React Native (Expo) mobile app and a Spring Boot backend with PostgreSQL, WebSockets, JWT auth, marketplace, messaging, stories/reels, notifications, and an in‑app token economy (MassCoin).
+Full‑stack social platform consisting of a React Native (Expo) mobile app and a Spring Boot backend with PostgreSQL, WebSockets, JWT auth, marketplace, messaging, stories/reels, notifications, and an in‑app token economy (MassCoin) with **Web3 blockchain integration**.
 
 ## Contents
 - Mobile app (Expo/React Native): `MasChat-main/`
@@ -15,12 +15,14 @@ Full‑stack social platform consisting of a React Native (Expo) mobile app and 
   - Axios API client with JWT interceptor in `MasChat-main/app/api/client.ts`
   - STOMP over WebSocket for realtime chat/notifications
   - Firebase (notifications), image/video capture, local media, theming
+  - **Web3 Integration**: MassCoin cryptocurrency, blockchain wallet, smart contracts
 
 - Backend (Spring Boot 3.5, Java 17)
   - REST APIs, WebSockets (`/ws-chat`), JWT auth, Flyway migrations
   - PostgreSQL database, JPA/Hibernate
   - Controllers in `MasChat-B-/src/main/java/.../controller`
   - Static uploads served from `uploads/`
+  - **Blockchain Services**: MassCoin management, transaction tracking
 
 ---
 
@@ -32,9 +34,34 @@ Full‑stack social platform consisting of a React Native (Expo) mobile app and 
 - Friends: requests, suggestions, lists, profiles
 - Notifications: in‑app banners, push integration
 - Marketplace: items, orders, reviews, saved searches, business accounts
-- MassCoin: balance, send/tip, staking, transactions, transfer requests
+- **MassCoin (Web3)**: ERC-20 token, balance, send/tip, staking, transactions, transfer requests, blockchain integration
 - Settings: privacy, security, notification, accessibility, content prefs
 - AI Chat: assistant via backend `AIChatController`
+
+---
+
+## Web3 & Blockchain Features
+
+### **MassCoin Cryptocurrency**
+- **ERC-20 Token**: Built on Polygon network with smart contracts
+- **Token Economics**: 1 billion total supply, staking rewards (5-15% APY)
+- **Smart Contracts**: MassCoin token and staking contracts (Solidity)
+- **Wallet Integration**: MetaMask, WalletConnect, and custom wallet support
+- **Cross-Platform**: Works on mobile, web, and desktop
+
+### **Blockchain Functionality**
+- **Real-time Transactions**: Instant MassCoin transfers between users
+- **Staking System**: Lock tokens for rewards and passive income
+- **Transaction History**: Complete on-chain transaction tracking
+- **Gas Optimization**: Efficient Polygon network transactions
+- **Smart Contract Integration**: Automated token distribution and management
+
+### **Development Status**
+- ✅ **Smart Contracts**: Compiled and ready for deployment
+- ✅ **Web3 Services**: Full blockchain integration layer
+- ✅ **Mock System**: Functional with simulated blockchain data
+- ✅ **UI Components**: Complete MassCoin interface
+- ⏳ **Network Deployment**: Ready for Polygon Amoy testnet or mainnet
 
 ---
 
@@ -45,6 +72,7 @@ Full‑stack social platform consisting of a React Native (Expo) mobile app and 
 - Maven (or use Maven wrapper)
 - PostgreSQL 14+
 - Android Studio (emulator) and/or Xcode (simulator), or a physical device
+- **For Web3**: MetaMask wallet, Polygon network access
 
 ---
 
@@ -102,6 +130,54 @@ Open the Expo Developer Tools and launch on your device/emulator.
 
 ---
 
+## Blockchain Setup
+
+### **Network Configuration**
+- **Polygon Amoy (Testnet)**: Chain ID 80002, RPC: `https://rpc-amoy.polygon.technology`
+- **Polygon Mainnet**: Chain ID 137, RPC: `https://polygon-rpc.com`
+
+### **Smart Contract Deployment**
+```bash
+cd MasChat-main
+
+# Compile contracts
+npm run compile
+
+# Deploy to testnet
+npm run deploy:amoy
+
+# Deploy to mainnet
+npm run deploy:polygon
+```
+
+### **Enable Blockchain Features**
+After deployment, update contract addresses in:
+- `app/lib/services/web3Service.ts` - Update `CONTRACT_ADDRESSES`
+- `app/lib/services/massCoinService.ts` - Update any hardcoded addresses
+
+Then enable blockchain functionality:
+```typescript
+// Programmatically
+massCoinService.enableBlockchain();
+web3Service.enableBlockchain();
+
+// Or via UI using BlockchainStatus component
+```
+
+### **Environment Variables**
+Create `.env` file with:
+```env
+# For Amoy testnet
+AMOY_RPC_URL=https://rpc-amoy.polygon.technology
+PRIVATE_KEY=your_private_key_here
+
+# For Polygon mainnet
+POLYGON_RPC_URL=https://polygon-rpc.com
+POLYGONSCAN_API_KEY=your_polygonscan_api_key
+```
+
+---
+
 ## Project Structure (high‑level)
 
 ```
@@ -111,9 +187,11 @@ MasChat-main/
     (create)/          # new post/reel/story/message
     (tabs)/            # home, videos, marketplace, notifications, profile, menu
     api/client.ts      # axios client (JWT interceptor), base URLs, WS URLs
-    context/           # Auth, Theme, Notification contexts
+    context/           # Auth, Theme, Notification, Web3 contexts
     friends/, marketplace/, screens/  # features
+    lib/services/      # API and Web3 services (massCoinService, web3Service)
   components/          # UI components (AI chat modal, MassCoin, headers, etc.)
+  contracts/           # Smart contracts (MassCoin.sol, MassCoinStaking.sol)
   assets/              # images, fonts, sounds
   config.ts            # imports API URL from api/client
   app.json             # Expo config (also includes extra.API_URL)
@@ -141,7 +219,7 @@ MasChat-B-/
   - `MessageController`, `ChatController`, `GroupController`
   - `FriendController`, `NotificationController`
   - `MarketplaceController`, `MarketplaceReviewController`, `MarketplaceSavedSearchController`, `MarketplaceBusinessAccountController`
-  - `MassCoinController`
+  - `MassCoinController`: **Web3 token management and transactions**
   - `AIChatController`, `DashboardController`, `HealthController`, `RootController`
 
 Database & migrations:
@@ -164,12 +242,14 @@ Static uploads:
 - Realtime via STOMP client (`@stomp/stompjs` + `sockjs-client`)
 - Media: camera, image picker, video, image manipulation
 - Push notifications (Expo/Firebase wiring), banners
-- MassCoin UI: balance, send/tip, staking, transfers
+- **MassCoin UI**: balance display, send/tip buttons, staking interface, transfer requests
+- **Web3 Integration**: wallet connection, blockchain status, transaction history
 - Error boundaries and modern UI components
 
 Scripts:
 - `npm run start` / `android` / `ios` / `web`
 - `npm run reset-project` (bootstraps a blank `app/`)
+- **Blockchain**: `npm run compile`, `npm run deploy:amoy`, `npm run deploy:polygon`
 - Windows helper: `start-expo.bat`
 
 ---
@@ -188,6 +268,7 @@ Mobile:
 - Primary: `MasChat-main/app/api/client.ts` (BASE_URL, WS_URL, UPLOAD_URL)
 - Keep `MasChat-main/app.json` → `extra.API_URL` consistent if used elsewhere
 - `MasChat-main/config.ts` simply re‑exports BASE_URL from `client.ts`
+- **Web3**: `MasChat-main/app/lib/services/web3Service.ts` (network config, contract addresses)
 
 IP addressing tips:
 - Use your machine's LAN IP (e.g. `192.168.x.y`) so a device on the same network can reach the backend
@@ -223,6 +304,15 @@ npx eas-cli build -p android   # requires Expo account and EAS setup
 npx eas-cli build -p ios
 ```
 
+**Smart Contract Deployment (Production)**:
+```bash
+cd MasChat-main
+npm run compile
+npm run deploy:polygon
+# Update contract addresses in services
+# Enable blockchain functionality
+```
+
 ---
 
 ## Troubleshooting
@@ -245,14 +335,22 @@ npx eas-cli build -p ios
 - Media upload/view issues
   - Check `uploads/` folder permissions and URL base in `client.ts`
 
+- **Blockchain/Web3 Issues**
+  - Ensure correct network configuration in `web3Service.ts`
+  - Verify contract addresses are updated after deployment
+  - Check RPC URL accessibility and network connectivity
+  - Use `BlockchainStatus` component to verify blockchain state
+
 ---
 
 ## Useful Scripts & Docs
 
 - Backend helpers: `MasChat-B-/setup-local-db.*`, `MasChat-B-/start-local.*`
 - Mobile helpers: `MasChat-main/start-expo.bat`, `MasChat-main/update-ip.bat`
+- **Blockchain helpers**: `MasChat-main/fix-metro.bat`, `MasChat-main/hackathon-start.bat`
 - Cloud/media docs: `MasChat-main/CLOUDINARY_SETUP.md`, `MasChat-main/UPLOAD_FIX.md`
 - Video notes: `MasChat-main/COMPREHENSIVE_VIDEO_AND_LIKE_FIXES.md`
+- **Blockchain setup**: `MasChat-main/BLOCKCHAIN_SETUP.md`
 
 ---
 
@@ -262,7 +360,7 @@ Base path: `/api`
 
 Selected areas (see controllers for details):
 - `/auth/*`, `/users/*`, `/posts/*`, `/stories/*`, `/reels/*`, `/messages/*`, `/friends/*`
-- `/notifications/*`, `/marketplace/*`, `/masscoin/*`, `/ai-chat/*`
+- `/notifications/*`, `/marketplace/*`, `/masscoin/*` (**Web3 token endpoints**), `/ai-chat/*`
 - Health: `/health` and `/actuator/health`
 
 ---
