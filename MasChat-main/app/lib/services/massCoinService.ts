@@ -6,6 +6,7 @@ export interface WalletInfo {
   userId: number;
   address: string;
   balance: number;
+  stakedAmount?: number;
   isActive: boolean;
   createdAt: string;
   updatedAt: string;
@@ -393,6 +394,11 @@ class MassCoinService {
 
   // Format amount for display
   formatAmount(amount: number): string {
+    // Handle null, undefined, or NaN values
+    if (amount == null || isNaN(amount)) {
+      return '0.00';
+    }
+    
     if (amount >= 1000000) {
       return (amount / 1000000).toFixed(2) + 'M';
     } else if (amount >= 1000) {
@@ -404,6 +410,11 @@ class MassCoinService {
 
   // Format USD value (mock for now)
   formatUsdValue(amount: number): string {
+    // Handle null, undefined, or NaN values
+    if (amount == null || isNaN(amount)) {
+      return '$0.00';
+    }
+    
     const usdValue = amount * 0.01; // Mock conversion rate
     return `$${usdValue.toFixed(2)}`;
   }
@@ -449,6 +460,7 @@ class MassCoinService {
       userId: 1,
       address: '0x1234567890123456789012345678901234567890',
       balance: 1000.0,
+      stakedAmount: 250.0,
       isActive: true,
       createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString()

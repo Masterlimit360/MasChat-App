@@ -16,7 +16,7 @@ import { Ionicons, MaterialIcons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useRouter } from 'expo-router';
 import { useAuth } from '../context/AuthContext';
-import { massCoinService, WalletInfo, TransferRequest } from '../lib/services/massCoinService';
+import { massCoinService, WalletInfo, TransferRequestInfo } from '../lib/services/massCoinService';
 import ModernHeader from '../../components/ModernHeader';
 
 // Color Palette
@@ -73,6 +73,7 @@ export default function SendMassScreen() {
   const loadWallet = async () => {
     try {
       setWalletLoading(true);
+      if (!user?.id) return;
       const walletData = await massCoinService.getWallet(Number(user.id));
       setWallet(walletData);
     } catch (error: any) {
@@ -99,7 +100,7 @@ export default function SendMassScreen() {
       return;
     }
 
-    if (wallet && parseFloat(amount) > wallet.balance) {
+    if (wallet && wallet.balance != null && parseFloat(amount) > (wallet.balance || 0)) {
       Alert.alert('Error', 'Insufficient balance');
       return;
     }
@@ -118,14 +119,14 @@ export default function SendMassScreen() {
     try {
       setLoading(true);
       
-      const transferRequest: TransferRequest = {
+      const transferRequest = {
         recipientId: recipientId.trim(),
         amount: parseFloat(amount),
         description: description.trim() || undefined,
         transactionType: 'P2P_TRANSFER'
       };
 
-      const transaction = await massCoinService.transferMass(transferRequest);
+      const transaction = await massCoinService.transferMass(Number(user?.id), transferRequest);
       
       Alert.alert(
         'Success',
@@ -197,7 +198,7 @@ export default function SendMassScreen() {
                 <Text style={styles.balanceLabel}>Available Balance</Text>
               </View>
               <Text style={styles.balanceAmount}>
-                {wallet ? formatAmount(wallet.balance) : '0.00'} MASS
+                {wallet ? formatAmount(wallet.balance || 0) : '0.00'} MASS
               </Text>
               <Text style={styles.balanceUsd}>
                 ≈ {wallet ? formatUsdValue(wallet.balance) : '$0.00'}

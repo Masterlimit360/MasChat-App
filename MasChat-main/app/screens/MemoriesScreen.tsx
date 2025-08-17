@@ -72,10 +72,17 @@ export default function MemoriesScreen() {
   const [selectedYear, setSelectedYear] = useState<number>(new Date().getFullYear());
 
   useEffect(() => {
-    loadData();
-  }, [activeFilter, selectedYear]);
+    if (user?.id) {
+      loadData();
+    }
+  }, [user?.id, activeFilter, selectedYear]);
 
   const loadData = async () => {
+    if (!user?.id) {
+      console.log('User not authenticated, skipping memories load');
+      return;
+    }
+    
     try {
       setLoading(true);
       
@@ -95,6 +102,11 @@ export default function MemoriesScreen() {
   };
 
   const onRefresh = async () => {
+    if (!user?.id) {
+      console.log('User not authenticated, skipping refresh');
+      return;
+    }
+    
     setRefreshing(true);
     await loadData();
     setRefreshing(false);

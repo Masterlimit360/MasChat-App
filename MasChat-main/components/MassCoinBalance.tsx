@@ -100,7 +100,7 @@ export default function MassCoinBalance({
         <MassCoinIcon size={currentSize.icon} style={styles.coinIcon} />
       )}
       <Text style={[styles.balanceText, currentSize.text]}>
-        {massCoinService.formatAmount(displayWallet.balance)}
+        {massCoinService.formatAmount(displayWallet?.balance || 0)}
       </Text>
       {clickable && (
         <Ionicons name="chevron-forward" size={16} color="#FFD700" style={styles.chevron} />

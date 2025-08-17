@@ -113,6 +113,7 @@ export default function Notifications() {
       webSocketFactory: () => socket,
       debug: str => console.log(str),
       onConnect: () => {
+        console.log('WebSocket connected successfully');
         client.subscribe(`/user/${user.id}/queue/notifications`, message => {
           const notificationData = JSON.parse(message.body);
           console.log('Received notification update:', notificationData);
@@ -171,6 +172,15 @@ export default function Notifications() {
           }
         });
       },
+      onStompError: (frame) => {
+        console.error('WebSocket STOMP error:', frame);
+      },
+      onWebSocketError: (error) => {
+        console.error('WebSocket error:', error);
+      },
+      onWebSocketClose: (event) => {
+        console.log('WebSocket closed:', event);
+      }
     });
     client.activate();
     return () => { client.deactivate(); };

@@ -449,7 +449,16 @@ class Web3Service {
   // Format amount for display
   formatAmount(amount: string): string {
     try {
+      // Handle null, undefined, or empty string
+      if (!amount || amount.trim() === '') {
+        return '0.00';
+      }
+      
       const num = parseFloat(amount);
+      if (isNaN(num)) {
+        return '0.00';
+      }
+      
       if (num >= 1000000) {
         return (num / 1000000).toFixed(2) + 'M';
       } else if (num >= 1000) {
@@ -458,14 +467,23 @@ class Web3Service {
         return num.toFixed(2);
       }
     } catch (error) {
-      return '0';
+      return '0.00';
     }
   }
 
   // Format USD value (mock for now)
   formatUsdValue(amount: string): string {
     try {
+      // Handle null, undefined, or empty string
+      if (!amount || amount.trim() === '') {
+        return '$0.00';
+      }
+      
       const num = parseFloat(amount);
+      if (isNaN(num)) {
+        return '$0.00';
+      }
+      
       const usdValue = num * 0.01; // Mock conversion rate
       return `$${usdValue.toFixed(2)}`;
     } catch (error) {

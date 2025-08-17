@@ -1,16 +1,26 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import axios from 'axios';
 import { Platform } from 'react-native';
+import Constants from 'expo-constants';
 
 // Function to get the device's IP address dynamically
 const getDeviceIP = (): string => {
-  // For development, use localhost
+  // Get IP from Expo constants (App.config.js)
+  const apiUrl = Constants.expoConfig?.extra?.API_URL;
+  if (apiUrl) {
+    // Extract IP from API_URL like "http://10.132.74.85:8080/api"
+    const match = apiUrl.match(/http:\/\/([^:]+):/);
+    if (match) {
+      return match[1];
+    }
+  }
+  
+  // Fallback to localhost for development
   if (__DEV__) {
     return 'localhost';
   }
   
   // For production, you can implement actual IP detection
-  // For now, return localhost as default
   return 'localhost';
 };
 
@@ -88,9 +98,11 @@ export const getUploadUrl = (fileName: string): string => {
   return `${UPLOAD_BASE_URL}/${fileName}`;
 };
 
-// Utility function to get WebSocket URL
+// Utility function to get WebSocket URL - Fixed for SockJS
 export const getWebSocketUrl = (): string => {
-  return WS_BASE_URL;
+  // For SockJS, we need to use HTTP URL, not WebSocket URL
+  const ip = getDeviceIP();
+  return `http://${ip}:8080/ws-chat`;
 };
 
 export default client;

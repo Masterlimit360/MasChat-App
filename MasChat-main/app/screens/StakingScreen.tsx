@@ -72,6 +72,7 @@ export default function StakingScreen() {
   const loadWallet = async () => {
     try {
       setWalletLoading(true);
+      if (!user?.id) return;
       const walletData = await massCoinService.getWallet(Number(user.id));
       setWallet(walletData);
     } catch (error: any) {
@@ -93,7 +94,7 @@ export default function StakingScreen() {
       return;
     }
 
-    if (wallet && parseFloat(amount) > wallet.balance) {
+    if (wallet && wallet.balance != null && parseFloat(amount) > (wallet.balance || 0)) {
       Alert.alert('Error', 'Insufficient balance');
       return;
     }
@@ -114,7 +115,7 @@ export default function StakingScreen() {
       return;
     }
 
-    if (wallet && parseFloat(amount) > wallet.stakedAmount) {
+    if (wallet && wallet.stakedAmount != null && parseFloat(amount) > (wallet.stakedAmount || 0)) {
       Alert.alert('Error', 'Insufficient staked amount');
       return;
     }
@@ -132,8 +133,11 @@ export default function StakingScreen() {
   const confirmStake = async () => {
     try {
       setLoading(true);
-      const updatedWallet = await massCoinService.stakeMass(parseFloat(amount));
-      setWallet(updatedWallet);
+      const success = await massCoinService.stakeMass(parseFloat(amount));
+      if (success && user?.id) {
+        const updatedWallet = await massCoinService.getWallet(Number(user.id));
+        setWallet(updatedWallet);
+      }
       setAmount('');
       
       Alert.alert(
@@ -152,8 +156,11 @@ export default function StakingScreen() {
   const confirmUnstake = async () => {
     try {
       setLoading(true);
-      const updatedWallet = await massCoinService.unstakeMass(parseFloat(amount));
-      setWallet(updatedWallet);
+      const success = await massCoinService.unstakeMass(parseFloat(amount));
+      if (success && user?.id) {
+        const updatedWallet = await massCoinService.getWallet(Number(user.id));
+        setWallet(updatedWallet);
+      }
       setAmount('');
       
       Alert.alert(
@@ -238,7 +245,7 @@ export default function StakingScreen() {
                 <Text style={[styles.statLabel, { color: colors.lightText }]}>Available</Text>
               </View>
               <Text style={[styles.statValue, { color: colors.text }]}>
-                {wallet ? formatAmount(wallet.balance) : '0.00'} MASS
+                {wallet ? formatAmount(wallet.balance || 0) : '0.00'} MASS
               </Text>
               <Text style={[styles.statUsd, { color: colors.lightText }]}>
                 ≈ {wallet ? formatUsdValue(wallet.balance) : '$0.00'}
@@ -251,10 +258,10 @@ export default function StakingScreen() {
                 <Text style={[styles.statLabel, { color: colors.lightText }]}>Staked</Text>
               </View>
               <Text style={[styles.statValue, { color: colors.text }]}>
-                {wallet ? formatAmount(wallet.stakedAmount) : '0.00'} MASS
+                {wallet ? formatAmount(wallet.stakedAmount || 0) : '0.00'} MASS
               </Text>
               <Text style={[styles.statUsd, { color: colors.lightText }]}>
-                ≈ {wallet ? formatUsdValue(wallet.stakedAmount) : '$0.00'}
+                ≈ {wallet ? formatUsdValue(wallet.stakedAmount || 0) : '$0.00'}
               </Text>
             </View>
           </View>
@@ -322,9 +329,9 @@ export default function StakingScreen() {
                 style={[styles.maxButton, { backgroundColor: colors.primary }]}
                 onPress={() => {
                   if (action === 'stake' && wallet) {
-                    setAmount(wallet.balance.toString());
+                    setAmount((wallet.balance || 0).toString());
                   } else if (action === 'unstake' && wallet) {
-                    setAmount(wallet.stakedAmount.toString());
+                    setAmount((wallet.stakedAmount || 0).toString());
                   }
                 }}
               >

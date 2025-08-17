@@ -5,6 +5,7 @@
   "scripts": {
     "start": "expo start",
     "reset-project": "node scripts/reset-project.js",
+    "update-ip": "node update-ip.js",
     "android": "expo start --android",
     "ios": "expo start --ios",
     "web": "expo start --web",
@@ -25,6 +26,8 @@
     "@react-navigation/native": "^7.1.6",
     "@react-navigation/stack": "^7.3.20",
     "@stomp/stompjs": "^7.1.1",
+    "ajv": "^6.12.6",
+    "ajv-keywords": "^3.5.2",
     "axios": "^1.10.0",
     "date-fns": "^4.1.0",
     "ethers": "^6.15.0",
@@ -82,7 +85,7 @@
     "eslint": "^9.25.0",
     "eslint-config-expo": "~9.2.0",
     "hardhat": "^2.26.3",
-    "metro": "^0.82.0",
+    "metro": "^0.82.5",
     "typescript": "~5.8.3"
   },
   "private": true

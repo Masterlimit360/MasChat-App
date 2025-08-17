@@ -253,7 +253,7 @@ const TransferRequestApprovalModal: React.FC<TransferRequestApprovalModalProps> 
                   {transferRequest.amount} Mass Coins
                 </Text>
                 <Text style={[styles.usdValue, { color: currentColors.textSecondary }]}>
-                  ≈ ${(transferRequest.amount * 0.01).toFixed(2)} USD
+                  ≈ ${((transferRequest.amount || 0) * 0.01).toFixed(2)} USD
                 </Text>
               </View>
 

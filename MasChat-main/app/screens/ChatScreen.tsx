@@ -149,24 +149,34 @@ export default function ChatScreen() {
 
   useEffect(() => {
     if (!currentUser?.id || !recipient?.id) return;
-    // Connect to WebSocket
-    const socket = new SockJS(getWebSocketUrl());
-    const client = new Client({
-      webSocketFactory: () => socket,
-      debug: str => console.log(str),
-      onConnect: () => {
-        client.subscribe(`/user/${currentUser.id}/queue/messages`, message => {
-          const msg = JSON.parse(message.body);
-          setMessages(prev => {
-            if (prev.some(m => m.id === msg.id)) return prev;
-            return dedupeMessages([...prev, msg]);
+      // Connect to WebSocket
+      const socket = new SockJS(getWebSocketUrl());
+      const client = new Client({
+        webSocketFactory: () => socket,
+        debug: str => console.log(str),
+        onConnect: () => {
+          console.log('Chat WebSocket connected successfully');
+          client.subscribe(`/user/${currentUser.id}/queue/messages`, message => {
+            const msg = JSON.parse(message.body);
+            setMessages(prev => {
+              if (prev.some(m => m.id === msg.id)) return prev;
+              return dedupeMessages([...prev, msg]);
+            });
           });
-        });
-      },
-    });
-    client.activate();
-    stompClient.current = client;
-    return () => { client.deactivate(); };
+        },
+        onStompError: (frame) => {
+          console.error('Chat WebSocket STOMP error:', frame);
+        },
+        onWebSocketError: (error) => {
+          console.error('Chat WebSocket error:', error);
+        },
+        onWebSocketClose: (event) => {
+          console.log('Chat WebSocket closed:', event);
+        }
+      });
+      client.activate();
+      stompClient.current = client;
+      return () => { client.deactivate(); };
   }, [currentUser?.id, recipient?.id]);
 
   const sendMessage = async () => {

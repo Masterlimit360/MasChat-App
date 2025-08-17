@@ -7,8 +7,6 @@ import { messageService, RecentChat } from '../lib/services/messageService';
 import { fetchStories, Story } from '../lib/services/storyService';
 import { BlurView } from 'expo-blur';
 import { LinearGradient } from 'expo-linear-gradient';
-import { Client } from '@stomp/stompjs';
-import SockJS from 'sockjs-client';
 import { getWebSocketUrl } from '../api/client';
 import { useTheme } from '../context/ThemeContext';
 
@@ -142,19 +140,39 @@ export default function MessengerScreen() {
     loadStories();
     
     // Connect to WebSocket
-    const socket = new SockJS(getWebSocketUrl());
-    const client = new Client({
-      webSocketFactory: () => socket,
-      debug: str => console.log(str),
-      onConnect: () => {
-        client.subscribe(`/user/${user.id}/queue/messages`, message => {
-          // On any new message, refresh recent chats
-          loadRecentChats();
-        });
-      },
-    });
-    client.activate();
-    return () => { client.deactivate(); };
+    const socket = new WebSocket(getWebSocketUrl());
+
+    socket.onopen = () => {
+      console.log('WebSocket connected');
+      socket.send(JSON.stringify({
+        type: 'authenticate',
+        token: user.token,
+      }));
+      socket.send(JSON.stringify({
+        type: 'subscribe',
+        destination: `/user/${user.id}/queue/messages`,
+      }));
+    };
+
+    socket.onmessage = (event) => {
+      const message = JSON.parse(event.data);
+      if (message.type === 'message') {
+        // On any new message, refresh recent chats
+        loadRecentChats();
+      }
+    };
+
+    socket.onerror = (error) => {
+      console.error('WebSocket error:', error);
+    };
+
+    socket.onclose = () => {
+      console.log('WebSocket closed');
+    };
+
+    return () => {
+      socket.close();
+    };
   }, [user?.id]);
 
   // Refresh chats when screen comes into focus

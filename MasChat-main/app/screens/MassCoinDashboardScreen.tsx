@@ -268,10 +268,10 @@ export default function MassCoinDashboardScreen() {
             </View>
             <Text style={styles.totalBalanceLabel}>Total Balance</Text>
             <Text style={styles.totalBalanceAmount}>
-              {wallet ? formatAmount(wallet.balance + wallet.stakedAmount) : '0.00'} MASS
+              {wallet ? formatAmount(wallet.balance + (wallet.stakedAmount || 0)) : '0.00'} MASS
             </Text>
             <Text style={styles.totalBalanceUsd}>
-              ≈ {wallet ? formatUsdValue(wallet.balance + wallet.stakedAmount) : '$0.00'}
+                              ≈ {wallet ? formatUsdValue(wallet.balance + (wallet.stakedAmount || 0)) : '$0.00'}
             </Text>
           </LinearGradient>
         </View>
@@ -284,7 +284,7 @@ export default function MassCoinDashboardScreen() {
               <Text style={[styles.detailLabel, { color: colors.text }]}>Available Balance</Text>
             </View>
             <Text style={[styles.detailAmount, { color: colors.text }]}>
-              {wallet ? formatAmount(wallet.balance) : '0.00'} MASS
+              {wallet ? formatAmount(wallet.balance || 0) : '0.00'} MASS
             </Text>
           </View>
 
@@ -294,7 +294,7 @@ export default function MassCoinDashboardScreen() {
               <Text style={[styles.detailLabel, { color: colors.text }]}>Staked Amount</Text>
             </View>
             <Text style={[styles.detailAmount, { color: colors.text }]}>
-              {wallet ? formatAmount(wallet.stakedAmount) : '0.00'} MASS
+              {wallet ? formatAmount(wallet.stakedAmount || 0) : '0.00'} MASS
             </Text>
           </View>
         </View>
@@ -395,7 +395,7 @@ export default function MassCoinDashboardScreen() {
           </Text>
           <View style={styles.stakingStats}>
             <Text style={[styles.stakingAmount, { color: colors.text }]}>
-              {wallet ? formatAmount(wallet.stakedAmount) : '0.00'}
+                              {wallet ? formatAmount(wallet.stakedAmount || 0) : '0.00'}
             </Text>
             <Text style={[styles.stakingLabel, { color: colors.lightText }]}>MASS Staked</Text>
           </View>
