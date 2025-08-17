@@ -128,6 +128,9 @@
             <scope>test</scope>
         </dependency>
 
+        <!-- Web3j Dependencies for Blockchain Integration -->
+        <!-- Removed - using mock blockchain functionality until contracts are deployed -->
+
     </dependencies>
 
     <build>

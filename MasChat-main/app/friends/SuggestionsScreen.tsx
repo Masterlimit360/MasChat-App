@@ -1,12 +1,12 @@
-import { Ionicons } from "@expo/vector-icons";
-import ModernHeader from '../components/ModernHeader';
-import { useRouter } from 'expo-router';
-import React, { useEffect, useState } from 'react';
-import { ActivityIndicator, ScrollView, StyleSheet, Text, TouchableOpacity, View, Alert } from 'react-native';
-import SuggestionCard from './SuggestionCard';
+import React, { useState, useEffect } from 'react';
+import { View, Text, ScrollView, StyleSheet, TouchableOpacity, ActivityIndicator } from 'react-native';
+import { Ionicons } from '@expo/vector-icons';
+import { useRouter, useFocusEffect } from 'expo-router';
 import { useAuth } from '../context/AuthContext';
+import { useTheme } from '../context/ThemeContext';
+import SuggestionCard from './SuggestionCard';
+import ModernHeader from '../../components/ModernHeader';
 import { friendService } from '../lib/services/friendService';
-import { useFocusEffect } from '@react-navigation/native';
 
 // Color Palette (matching home screen)
 const COLORS = {
@@ -113,7 +113,7 @@ export default function SuggestionsScreen() {
       <ModernHeader 
         title="Friend Suggestions" 
         showBackButton={true}
-        onBackPress={() => router.back()}
+        onBack={() => router.back()}
       />
       
       <ScrollView 

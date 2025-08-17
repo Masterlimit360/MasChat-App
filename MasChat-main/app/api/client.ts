@@ -2,16 +2,22 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import axios from 'axios';
 import { Platform } from 'react-native';
 
-// Function to get the device's IP address
+// Function to get the device's IP address dynamically
 const getDeviceIP = (): string => {
-  // Auto-detected IP address
-  return '10.225.193.125'; // Current IP address
+  // For development, use localhost
+  if (__DEV__) {
+    return 'localhost';
+  }
+  
+  // For production, you can implement actual IP detection
+  // For now, return localhost as default
+  return 'localhost';
 };
 
 // Centralized configuration
 export const API_CONFIG = {
   BASE_URL: `http://${getDeviceIP()}:8080/api`,
-  WS_URL: `http://${getDeviceIP()}:8080/ws-chat`,
+  WS_URL: `ws://${getDeviceIP()}:8080/ws-chat`,
   UPLOAD_URL: `http://${getDeviceIP()}:8080/uploads`,
   PORT: 8080,
   IP: getDeviceIP(),
@@ -24,6 +30,7 @@ export const UPLOAD_BASE_URL = API_CONFIG.UPLOAD_URL;
 
 const client = axios.create({
   baseURL: BASE_URL,
+  timeout: 10000, // 10 second timeout
 });
 
 // Add request interceptor to automatically add Authorization header
@@ -66,10 +73,10 @@ client.interceptors.response.use(
 // Utility function to test backend connection
 export const testConnection = async () => {
   try {
-    const response = await client.get('/auth/test', {
+    const response = await client.get('/actuator/health', {
       timeout: 5000
     });
-    return response.data === "Backend connection successful";
+    return response.data?.status === "UP";
   } catch (error) {
     console.error("Backend connection test failed:", error);
     return false;

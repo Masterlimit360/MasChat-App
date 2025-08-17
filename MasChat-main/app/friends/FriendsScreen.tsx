@@ -1,10 +1,11 @@
-import { Ionicons } from "@expo/vector-icons";
-import { LinearGradient } from 'expo-linear-gradient';
-import React, { useEffect, useState } from 'react';
-import { Text, View, TextInput, TouchableOpacity, Image, ScrollView, StyleSheet, StatusBar, Platform, ActivityIndicator, Alert } from 'react-native';
-import { useRouter } from 'expo-router';
-import { useFocusEffect } from '@react-navigation/native';
+import React, { useState, useEffect } from 'react';
+import { View, Text, ScrollView, StyleSheet, TouchableOpacity, ActivityIndicator, TextInput } from 'react-native';
+import { Ionicons } from '@expo/vector-icons';
+import { useRouter, useFocusEffect } from 'expo-router';
 import { useAuth } from '../context/AuthContext';
+import { useTheme } from '../context/ThemeContext';
+import FriendCard from './FriendCard';
+import ModernHeader from '../../components/ModernHeader';
 import { friendService } from '../lib/services/friendService';
 
 // Color Palette (matching home screen)
@@ -113,14 +114,7 @@ export default function FriendsScreen() {
               style={styles.addFriendsButton}
               onPress={() => router.push('/friends/SuggestionsScreen')}
             >
-              <LinearGradient
-                colors={[COLORS.primary, '#2B6CD9']}
-                style={styles.addFriendsGradient}
-                start={{ x: 0, y: 0 }}
-                end={{ x: 1, y: 0 }}
-              >
-                <Text style={styles.addFriendsText}>Find Friends</Text>
-              </LinearGradient>
+              <Text style={styles.addFriendsText}>Find Friends</Text>
             </TouchableOpacity>
           )}
         </View>
@@ -128,64 +122,35 @@ export default function FriendsScreen() {
     }
 
     return filteredFriends.map(friend => (
-      <View key={friend.id} style={styles.friendItem}>
-        <TouchableOpacity onPress={() => router.push({ pathname: '/screens/FriendsProfileScreen', params: { userId: friend.id } })}>
-          <Image 
-            source={{ uri: friend.profilePicture || 'https://randomuser.me/api/portraits/men/1.jpg' }} 
-            style={styles.friendAvatar} 
-          />
-        </TouchableOpacity>
-        <View style={styles.friendInfo}>
-          <Text style={styles.friendName}>{friend.fullName || friend.username}</Text>
-          <Text style={styles.friendUsername}>@{friend.username}</Text>
-        </View>
-        <TouchableOpacity 
-          style={styles.messageButton} 
-          onPress={() => router.push({ 
-            pathname: '/screens/ChatScreen', 
-            params: { 
-              recipient: JSON.stringify({ 
-                id: friend.id, 
-                username: friend.username, 
-                fullName: friend.fullName, 
-                profilePicture: friend.profilePicture 
-              }) 
-            } 
-          })}
-        >
-          <Ionicons name="chatbubble-outline" size={20} color={COLORS.primary} />
-        </TouchableOpacity>
-      </View>
+      <FriendCard key={friend.id} friend={friend} />
     ));
   };
 
   return (
     <View style={styles.container}>
-      <StatusBar backgroundColor={COLORS.primary} barStyle="light-content" translucent />
+      <ModernHeader 
+        title="Friends" 
+        showBackButton={true}
+        onBack={() => router.back()}
+      />
       
-      {/* Header */}
-      <LinearGradient
-        colors={[COLORS.primary, '#2B6CD9']}
-        style={[styles.header, { paddingTop: Platform.OS === 'ios' ? 50 : (StatusBar.currentHeight || 0) + 10 }]}
-        start={{ x: 0, y: 0 }}
-        end={{ x: 1, y: 0 }}
-      >
-        <Text style={styles.headerTitle}>Friends</Text>
-        <View style={styles.headerButtons}>
-          <TouchableOpacity 
-            style={styles.headerButton}
-            onPress={() => router.push('/friends/FriendRequestsScreen')}
-          >
-            <Ionicons name="person-add" size={20} color="white" />
-          </TouchableOpacity>
-          <TouchableOpacity 
-            style={styles.headerButton}
-            onPress={() => router.push('/friends/SuggestionsScreen')}
-          >
-            <Ionicons name="people-outline" size={20} color="white" />
-          </TouchableOpacity>
-        </View>
-      </LinearGradient>
+      {/* Action Buttons */}
+      <View style={styles.actionButtons}>
+        <TouchableOpacity 
+          style={styles.actionButton}
+          onPress={() => router.push('/friends/FriendRequestsScreen')}
+        >
+          <Ionicons name="person-add" size={20} color={COLORS.primary} />
+          <Text style={styles.actionButtonText}>Requests</Text>
+        </TouchableOpacity>
+        <TouchableOpacity 
+          style={styles.actionButton}
+          onPress={() => router.push('/friends/SuggestionsScreen')}
+        >
+          <Ionicons name="people-outline" size={20} color={COLORS.primary} />
+          <Text style={styles.actionButtonText}>Find Friends</Text>
+        </TouchableOpacity>
+      </View>
 
       {/* Search Bar */}
       <View style={styles.searchContainer}>
@@ -213,30 +178,6 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: COLORS.background,
-  },
-  header: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingHorizontal: 16,
-    paddingBottom: 12,
-  },
-  headerTitle: {
-    fontSize: 24,
-    fontWeight: 'bold',
-    color: 'white',
-  },
-  headerButtons: {
-    flexDirection: 'row',
-    gap: 10,
-  },
-  headerButton: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    backgroundColor: 'rgba(255, 255, 255, 0.2)',
-    justifyContent: 'center',
-    alignItems: 'center',
   },
   searchContainer: {
     backgroundColor: COLORS.white,
@@ -324,8 +265,7 @@ const styles = StyleSheet.create({
   },
   addFriendsButton: {
     marginTop: 20,
-  },
-  addFriendsGradient: {
+    backgroundColor: COLORS.primary,
     paddingHorizontal: 30,
     paddingVertical: 12,
     borderRadius: 25,
@@ -335,45 +275,28 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: '600',
   },
-  friendItem: {
+
+  actionButtons: {
+    flexDirection: 'row',
+    justifyContent: 'space-around',
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    backgroundColor: COLORS.white,
+    borderBottomWidth: 1,
+    borderBottomColor: '#eee',
+  },
+  actionButton: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: COLORS.white,
-    marginHorizontal: 16,
-    marginVertical: 4,
-    padding: 12,
-    borderRadius: 12,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 3,
-  },
-  friendAvatar: {
-    width: 50,
-    height: 50,
-    borderRadius: 25,
-    marginRight: 12,
-  },
-  friendInfo: {
-    flex: 1,
-  },
-  friendName: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: COLORS.text,
-  },
-  friendUsername: {
-    fontSize: 14,
-    color: COLORS.lightText,
-    marginTop: 2,
-  },
-  messageButton: {
-    width: 40,
-    height: 40,
+    paddingHorizontal: 16,
+    paddingVertical: 8,
     borderRadius: 20,
     backgroundColor: COLORS.background,
-    justifyContent: 'center',
-    alignItems: 'center',
+  },
+  actionButtonText: {
+    marginLeft: 8,
+    fontSize: 14,
+    fontWeight: '600',
+    color: COLORS.primary,
   },
 });

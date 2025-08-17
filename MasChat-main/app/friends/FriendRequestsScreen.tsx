@@ -1,12 +1,12 @@
-import { Ionicons } from "@expo/vector-icons";
-import { LinearGradient } from 'expo-linear-gradient';
-import { useRouter } from 'expo-router';
-import React, { useEffect, useState } from 'react';
-import { ActivityIndicator, ScrollView, StyleSheet, Text, TouchableOpacity, View, Alert } from 'react-native';
-import FriendRequestCard from './FriendRequestCard';
+import React, { useState, useEffect } from 'react';
+import { View, Text, ScrollView, StyleSheet, TouchableOpacity, ActivityIndicator } from 'react-native';
+import { Ionicons } from '@expo/vector-icons';
+import { useRouter, useFocusEffect } from 'expo-router';
 import { useAuth } from '../context/AuthContext';
+import { useTheme } from '../context/ThemeContext';
+import FriendRequestCard from './FriendRequestCard';
+import ModernHeader from '../../components/ModernHeader';
 import { friendService } from '../lib/services/friendService';
-import { useFocusEffect } from '@react-navigation/native';
 
 // Color Palette (matching home screen)
 const COLORS = {
@@ -119,18 +119,10 @@ export default function FriendRequestsScreen() {
   return (
     <View style={styles.container}>
       {/* Header */}
-      <LinearGradient
-        colors={[COLORS.primary, '#2B6CD9']}
-        style={styles.header}
-        start={{ x: 0, y: 0 }}
-        end={{ x: 1, y: 0 }}
-      >
-        <TouchableOpacity onPress={() => router.back()} style={styles.backButton}>
-          <Ionicons name="arrow-back" size={24} color="white" />
-        </TouchableOpacity>
-        <Text style={styles.headerTitle}>Friend Requests</Text>
-        <View style={styles.placeholder} />
-      </LinearGradient>
+             <ModernHeader
+         title="Friend Requests"
+         onBack={() => router.back()}
+       />
 
       {/* Section Header */}
       <View style={styles.sectionHeader}>

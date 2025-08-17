@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Image, RefreshControl, Alert, Modal, Dimensions, FlatList, Animated, Share, Easing, ActivityIndicator, TouchableWithoutFeedback } from 'react-native';
-import { useRouter } from 'expo-router';
+import { useRouter, useFocusEffect } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { Video, ResizeMode } from 'expo-av';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -12,7 +12,6 @@ import { fetchStories, Story } from '../lib/services/storyService';
 import CommentDialog from '../components/CommentDialog';
 import MassCoinTipButton from '../../components/MassCoinTipButton';
 import MassCoinIcon from '../../components/MassCoinIcon';
-import { useFocusEffect } from '@react-navigation/native';
 
 
 // Modern Color Palette

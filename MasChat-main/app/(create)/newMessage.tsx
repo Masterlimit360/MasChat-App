@@ -1,11 +1,11 @@
-import { Ionicons } from "@expo/vector-icons";
-import { LinearGradient } from 'expo-linear-gradient';
-import React, { useEffect, useState } from 'react';
-import { Text, View, TextInput, TouchableOpacity, Image, ScrollView, StyleSheet, StatusBar, Platform, FlatList, ActivityIndicator, Alert, RefreshControl } from 'react-native';
-import { useRouter } from 'expo-router';
-import { useFocusEffect } from '@react-navigation/native';
+import React, { useState, useEffect, useRef } from 'react';
+import { View, Text, TextInput, TouchableOpacity, FlatList, StyleSheet, Alert, KeyboardAvoidingView, Platform } from 'react-native';
+import { useRouter, useFocusEffect } from 'expo-router';
+import { Ionicons } from '@expo/vector-icons';
 import { useAuth } from '../context/AuthContext';
-import { friendService, User } from '../lib/services/friendService';
+import { useTheme } from '../context/ThemeContext';
+import { friendService } from '../lib/services/friendService';
+import ModernHeader from '../../components/ModernHeader';
 
 // Color Palette (matching home/friends screens)
 const COLORS = {
@@ -19,9 +19,9 @@ const COLORS = {
 
 export default function NewMessage() {
   const [search, setSearch] = useState('');
-  const [users, setUsers] = useState<User[]>([]);
-  const [friends, setFriends] = useState<User[]>([]);
-  const [suggestions, setSuggestions] = useState<User[]>([]);
+  const [users, setUsers] = useState<any[]>([]); // Changed to any[] as User type is removed
+  const [friends, setFriends] = useState<any[]>([]); // Changed to any[] as User type is removed
+  const [suggestions, setSuggestions] = useState<any[]>([]); // Changed to any[] as User type is removed
   const [loading, setLoading] = useState(false);
   const [searchLoading, setSearchLoading] = useState(false);
   const [aiLoading, setAiLoading] = useState(false);
@@ -122,7 +122,7 @@ export default function NewMessage() {
     }
   };
 
-  const startConversation = (recipient: User) => {
+  const startConversation = (recipient: any) => { // Changed to any as User type is removed
     router.push({
       pathname: "/screens/ChatScreen",
       params: { recipient: JSON.stringify(recipient) }
@@ -130,7 +130,7 @@ export default function NewMessage() {
   };
 
   // AI image generation for direct message
-  const generateAIImageAndSend = async (recipient: User) => {
+  const generateAIImageAndSend = async (recipient: any) => { // Changed to any as User type is removed
     Alert.prompt('AI Image Message', 'Describe the image to send:', async (prompt) => {
       if (!prompt) return;
       setAiLoading(true);
@@ -164,16 +164,17 @@ export default function NewMessage() {
     });
   };
 
-  const renderUserItem = ({ item }: { item: User }) => (
+  const renderUserItem = ({ item }: { item: any }) => ( // Changed to any as User type is removed
     <TouchableOpacity 
       style={styles.userItem}
       onPress={() => startConversation(item)}
       onLongPress={() => generateAIImageAndSend(item)}
     >
-      <Image 
-        source={{ uri: item.profilePicture || 'https://randomuser.me/api/portraits/men/1.jpg' }} 
+      <View 
         style={styles.userAvatar} 
-      />
+      >
+        <Ionicons name="person" size={24} color={COLORS.primary} />
+      </View>
       <View style={styles.userInfo}>
         <Text style={styles.userName}>{item.fullName || item.username}</Text>
         <Text style={styles.userUsername}>@{item.username}</Text>
@@ -198,21 +199,7 @@ export default function NewMessage() {
 
   return (
     <View style={styles.container}>
-      <StatusBar backgroundColor={COLORS.primary} barStyle="light-content" translucent />
-      
-      {/* Header */}
-      <LinearGradient
-        colors={[COLORS.primary, '#2B6CD9']}
-        style={[styles.header, { paddingTop: Platform.OS === 'ios' ? 50 : (StatusBar.currentHeight || 0) + 10 }]}
-        start={{ x: 0, y: 0 }}
-        end={{ x: 1, y: 0 }}
-      >
-        <TouchableOpacity onPress={() => router.back()} style={styles.backButton}>
-          <Ionicons name="arrow-back" size={24} color="white" />
-        </TouchableOpacity>
-        <Text style={styles.headerTitle}>New Message</Text>
-        <View style={styles.placeholder} />
-      </LinearGradient>
+      <ModernHeader title="New Message" onBack={() => router.back()} />
 
       {/* Search Bar */}
       <View style={styles.searchContainer}>
@@ -249,10 +236,11 @@ export default function NewMessage() {
             {renderSectionHeader('Search Results')}
             {users.map(user => (
               <View key={user.id} style={styles.userItem}>
-                <Image 
-                  source={{ uri: user?.profilePicture || 'https://randomuser.me/api/portraits/men/1.jpg' }} 
+                <View 
                   style={styles.userAvatar} 
-                />
+                >
+                  <Ionicons name="person" size={24} color={COLORS.primary} />
+                </View>
                 <View style={styles.userInfo}>
                   <Text style={styles.userName}>{user.fullName || user.username}</Text>
                   <Text style={styles.userUsername}>@{user.username}</Text>
@@ -289,10 +277,11 @@ export default function NewMessage() {
                     style={styles.userItem}
                     onPress={() => startConversation(friend)}
                   >
-                    <Image 
-                      source={{ uri: friend.profilePicture || 'https://randomuser.me/api/portraits/men/1.jpg' }} 
+                    <View 
                       style={styles.userAvatar} 
-                    />
+                    >
+                      <Ionicons name="person" size={24} color={COLORS.primary} />
+                    </View>
                     <View style={styles.userInfo}>
                       <Text style={styles.userName}>{friend.fullName || friend.username}</Text>
                       <Text style={styles.userUsername}>@{friend.username}</Text>
@@ -313,10 +302,11 @@ export default function NewMessage() {
             {renderSectionHeader('Friends You Haven\'t Chatted With')}
             {suggestions.map(suggestion => (
               <View key={suggestion.id} style={styles.userItem}>
-                <Image 
-                  source={{ uri: suggestion.profilePicture || 'https://randomuser.me/api/portraits/men/1.jpg' }} 
+                <View 
                   style={styles.userAvatar} 
-                />
+                >
+                  <Ionicons name="person" size={24} color={COLORS.primary} />
+                </View>
                 <View style={styles.userInfo}>
                   <Text style={styles.userName}>{suggestion.fullName || suggestion.username}</Text>
                   <Text style={styles.userUsername}>@{suggestion.username}</Text>
@@ -448,6 +438,9 @@ const styles = StyleSheet.create({
     height: 48,
     borderRadius: 24,
     marginRight: 12,
+    backgroundColor: '#f0f2f5',
+    justifyContent: 'center',
+    alignItems: 'center',
   },
   userInfo: {
     flex: 1,
