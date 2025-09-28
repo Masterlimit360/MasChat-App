@@ -71,7 +71,7 @@ export default ({ config }) => ({
       projectId: '11448f8f-45d1-4c2c-a061-f9227f473390'
     },
     // Use environment variable or fallback to localhost for development
-    API_URL: process.env.API_URL || 'http://10.132.74.85:8080/api',
+    API_URL: process.env.API_URL || 'http://192.168.100.226:8080/api',
     ENV: process.env.NODE_ENV || 'development',
     router: {}
   },
