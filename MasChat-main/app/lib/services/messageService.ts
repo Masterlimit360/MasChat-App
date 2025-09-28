@@ -1,4 +1,4 @@
-import client from '../../api/client';
+import { supabase } from '../../../lib/supabase';
 
 export interface Message {
   id: string;
@@ -29,128 +29,161 @@ export const messageService = {
   // Get conversation between two users
   async getConversation(userId1: string, userId2: string): Promise<Message[]> {
     try {
-      const response = await client.get(`/messages/conversation?userId1=${userId1}&userId2=${userId2}`);
-      return response.data;
+      const { data, error } = await supabase
+        .from('messages')
+        .select('*')
+        .or(`and(sender_id.eq.${userId1},recipient_id.eq.${userId2}),and(sender_id.eq.${userId2},recipient_id.eq.${userId1})`)
+        .order('created_at', { ascending: true });
+
+      if (error) throw error;
+
+      return data?.map(message => ({
+        id: message.id,
+        sender: { id: message.sender_id },
+        recipient: { id: message.recipient_id },
+        content: message.content,
+        image: message.image_url,
+        audio: message.audio_url,
+        time: message.created_at,
+        sentAt: message.created_at,
+        isPending: false,
+        failed: false,
+        read: message.read || false
+      })) || [];
     } catch (error) {
       console.error('Error getting conversation:', error);
       return [];
     }
   },
 
+  // Send message
+  async sendMessage(senderId: string, recipientId: string, content: string, imageUrl?: string, audioUrl?: string): Promise<Message> {
+    try {
+      const { data, error } = await supabase
+        .from('messages')
+        .insert({
+          sender_id: senderId,
+          recipient_id: recipientId,
+          content: content,
+          image_url: imageUrl,
+          audio_url: audioUrl,
+          read: false
+        })
+        .select()
+        .single();
+
+      if (error) throw error;
+
+      return {
+        id: data.id,
+        sender: { id: data.sender_id },
+        recipient: { id: data.recipient_id },
+        content: data.content,
+        image: data.image_url,
+        audio: data.audio_url,
+        time: data.created_at,
+        sentAt: data.created_at,
+        isPending: false,
+        failed: false,
+        read: data.read
+      };
+    } catch (error) {
+      console.error('Error sending message:', error);
+      throw error;
+    }
+  },
+
   // Get recent chats for a user
   async getRecentChats(userId: string): Promise<RecentChat[]> {
     try {
-      const response = await client.get(`/messages/recent/${userId}`);
-      return response.data;
+      // This is a simplified version - you might need to implement a more complex query
+      // to get the actual last message and unread count
+      const { data, error } = await supabase
+        .from('messages')
+        .select(`
+          recipient:recipient_id (
+            id,
+            username,
+            full_name,
+            profile_image_url
+          )
+        `)
+        .eq('sender_id', userId)
+        .order('created_at', { ascending: false })
+        .limit(20);
+
+      if (error) throw error;
+
+      // Group by recipient and get unique chats
+      const uniqueChats = new Map();
+      data?.forEach(message => {
+        const recipient = message.recipient;
+        if (recipient && !uniqueChats.has(recipient.id)) {
+          uniqueChats.set(recipient.id, {
+            id: recipient.id,
+            username: recipient.username,
+            fullName: recipient.full_name,
+            profilePicture: recipient.profile_image_url,
+            lastMessage: 'Message',
+            lastMessageTime: new Date().toISOString(),
+            unreadCount: 0,
+            isOnline: false
+          });
+        }
+      });
+
+      return Array.from(uniqueChats.values());
     } catch (error) {
       console.error('Error getting recent chats:', error);
       return [];
     }
   },
 
-  // Send a message
-  async sendMessage(senderId: string, recipientId: string, content: string): Promise<Message | null> {
+  // Mark message as read
+  async markAsRead(messageId: string): Promise<void> {
     try {
-      const response = await client.post('/messages/send', null, {
-        params: { senderId, recipientId, content }
-      });
-      return response.data;
+      const { error } = await supabase
+        .from('messages')
+        .update({ read: true })
+        .eq('id', messageId);
+
+      if (error) throw error;
     } catch (error) {
-      console.error('Error sending message:', error);
-      return null;
+      console.error('Error marking message as read:', error);
     }
   },
 
-  // Send an image message
-  async sendImageMessage(senderId: string, recipientId: string, imageUrl: string, content?: string): Promise<Message | null> {
+  // Delete message
+  async deleteMessage(messageId: string, userId: string): Promise<boolean> {
     try {
-      console.log('Sending image message:', { senderId, recipientId, imageUrl, content });
-      const response = await client.post('/messages/send-image', {
-        senderId,
-        recipientId,
-        imageUrl,
-        content,
-      });
-      console.log('Image message sent successfully:', response.data);
-      return response.data;
-    } catch (error: any) {
-      console.error('Error sending image message:', error);
-      if (error.response) {
-        console.error('Response status:', error.response.status);
-        console.error('Response data:', error.response.data);
-      }
-      return null;
-    }
-  },
+      const { error } = await supabase
+        .from('messages')
+        .delete()
+        .eq('id', messageId)
+        .eq('sender_id', userId);
 
-  // Send an audio message
-  async sendAudioMessage(senderId: string, recipientId: string, audioUrl: string, content?: string): Promise<Message | null> {
-    try {
-      console.log('Sending audio message:', { senderId, recipientId, audioUrl, content });
-      const response = await client.post('/messages/send-audio', {
-        senderId,
-        recipientId,
-        audioUrl,
-        content,
-      });
-      console.log('Audio message sent successfully:', response.data);
-      return response.data;
-    } catch (error: any) {
-      console.error('Error sending audio message:', error);
-      if (error.response) {
-        console.error('Response status:', error.response.status);
-        console.error('Response data:', error.response.data);
-      }
-      return null;
-    }
-  },
-
-  // Mark messages as read
-  async markAsRead(userId: string, partnerId: string): Promise<void> {
-    try {
-      await client.post('/messages/mark-read', null, {
-        params: { userId, partnerId }
-      });
-    } catch (error) {
-      console.error('Error marking messages as read:', error);
-    }
-  },
-
-  // Delete a message
-  async deleteMessage(messageId: string, userId: string): Promise<void> {
-    try {
-      await client.delete(`/messages/${messageId}?userId=${userId}`);
+      if (error) throw error;
+      return true;
     } catch (error) {
       console.error('Error deleting message:', error);
+      return false;
     }
   },
 
-  // Delete entire conversation
-  async deleteConversation(userId: string, partnerId: string): Promise<void> {
+  // Get unread message count
+  async getUnreadCount(userId: string): Promise<number> {
     try {
-      await client.delete('/messages/conversation', {
-        params: { userId, partnerId }
-      });
+      const { count, error } = await supabase
+        .from('messages')
+        .select('*', { count: 'exact', head: true })
+        .eq('recipient_id', userId)
+        .eq('read', false);
+
+      if (error) throw error;
+      return count || 0;
     } catch (error) {
-      console.error('Error deleting conversation:', error);
-    }
-  },
-
-  // Test image column functionality
-  async testImageColumn(): Promise<any> {
-    try {
-      const response = await client.get('/messages/test-image-column');
-      return response.data;
-    } catch (error: any) {
-      console.error('Error testing image column:', error);
-      if (error.response) {
-        console.error('Response status:', error.response.status);
-        console.error('Response data:', error.response.data);
-      }
-      throw error;
+      console.error('Error getting unread count:', error);
+      return 0;
     }
   }
 };
-
-// Default export to fix warning
-export default messageService; 

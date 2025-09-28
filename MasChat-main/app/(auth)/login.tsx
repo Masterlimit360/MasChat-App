@@ -7,7 +7,6 @@ import { Image, StatusBar, StyleSheet, Text, TextInput, TouchableOpacity, View, 
 import * as Animatable from 'react-native-animatable';
 import Toast from 'react-native-toast-message';
 import { useAuth } from '../context/AuthContext';
-import client, { BASE_URL, testConnection } from '../api/client';
 
 // Color Palette (matching home screen)
 const COLORS = {
@@ -36,10 +35,10 @@ const COLORS = {
 };
 
 export default function Login() {
-  const [username, setUsername] = useState("");
+  const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [errors, setErrors] = useState({
-    username: '',
+    email: '',
     password: '',
   });
   const [loading, setLoading] = useState(false);
@@ -53,12 +52,15 @@ export default function Login() {
   const validateForm = () => {
     let valid = true;
     const newErrors = {
-      username: '',
+      email: '',
       password: '',
     };
 
-    if (!username.trim()) {
-      newErrors.username = 'Username is required';
+    if (!email.trim()) {
+      newErrors.email = 'Email is required';
+      valid = false;
+    } else if (!/\S+@\S+\.\S+/.test(email)) {
+      newErrors.email = 'Please enter a valid email';
       valid = false;
     }
 
@@ -77,65 +79,21 @@ export default function Login() {
   const handleLogin = async () => {
     if (!validateForm()) return;
 
-    const isConnected = await testConnection();
-    if (!isConnected) {
-      Toast.show({
-        type: 'error',
-        text1: 'Connection Failed',
-        text2: 'Cannot reach server. Check your network and server IP.',
-        position: 'top',
-        visibilityTime: 4000,
-        topOffset: 60,
-      });
-      return;
-    }
-
     setLoading(true);
     try {
-      const response = await client.post(
-        `/auth/login`,
-        { username: username.trim(), password },
-        { headers: { 'Content-Type': 'application/json' }, timeout: 10000 }
-      );
-
-      if (response.data?.token) {
-        const { token, user, userId, username: responseUsername } = response.data;
-        
-        // Create user object with proper structure
-        const userObj = {
-          id: userId || user?.id,
-          username: responseUsername || user?.username,
-          email: user?.email,
-          fullName: user?.fullName,
-          profilePicture: user?.profilePicture,
-          coverPhoto: user?.coverPhoto,
-          bio: user?.bio,
-          createdAt: user?.createdAt,
-          updatedAt: user?.updatedAt,
-          verified: user?.verified,
-          ...user // Include any additional fields
-        };
-        
-        await signIn(token, userObj);
-        await AsyncStorage.setItem('userToken', token);
-        await AsyncStorage.setItem('user', JSON.stringify(userObj));
-        await AsyncStorage.setItem('username', userObj.username);
-        
-        Toast.show({
-          type: 'success',
-          text1: 'Login Successful',
-          text2: 'Welcome back to MasChat!',
-          position: 'top',
-          visibilityTime: 3000,
-          topOffset: 60,
-        });
-        router.replace('/(tabs)/home');
-      }
+      await signIn(email.trim(), password);
+      
+      Toast.show({
+        type: 'success',
+        text1: 'Login Successful',
+        text2: 'Welcome back to MasChat!',
+        position: 'top',
+        visibilityTime: 3000,
+        topOffset: 60,
+      });
     } catch (error: any) {
       let errorMessage = 'Login failed. Please try again.';
-      if (error.response?.data?.message) {
-        errorMessage = error.response.data.message;
-      } else if (error.message) {
+      if (error.message) {
         errorMessage = error.message;
       }
       Toast.show({
@@ -150,17 +108,6 @@ export default function Login() {
       setLoading(false);
     }
   };
-
-  const testConnection = async () => {
-    try {
-      await client.get(`/auth/test`, { timeout: 3000 });
-      return true;
-    } catch (error) {
-      return false;
-    }
-  };
-
-  useEffect(() => { testConnection(); }, []);
 
   return (
     <View style={[styles.container, { backgroundColor: colors.background }]}>
@@ -183,19 +130,20 @@ export default function Login() {
           <Text style={[styles.title, { color: colors.primary }]}>Welcome Back!</Text>
           <Text style={[styles.subtitle, { color: colors.lightText }]}>Connect, chat, and share with MasChat</Text>
 
-          {/* Username Input */}
+          {/* Email Input */}
           <View style={styles.inputContainer}>
-            <Ionicons name="person-outline" size={20} color={colors.lightText} style={styles.inputIcon} />
+            <Ionicons name="mail-outline" size={20} color={colors.lightText} style={styles.inputIcon} />
             <TextInput
               style={[styles.input, { color: colors.text, backgroundColor: colors.card, borderColor: colors.border }]}
-              placeholder="Username"
+              placeholder="Email"
               placeholderTextColor={colors.lightText}
-              value={username}
-              onChangeText={setUsername}
+              value={email}
+              onChangeText={setEmail}
               autoCapitalize="none"
+              keyboardType="email-address"
             />
           </View>
-          {errors.username && <Text style={[styles.errorText, { color: colors.error }]}>{errors.username}</Text>}
+          {errors.email && <Text style={[styles.errorText, { color: colors.error }]}>{errors.email}</Text>}
 
           {/* Password Input */}
           <View style={styles.inputContainer}>

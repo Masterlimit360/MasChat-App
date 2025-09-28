@@ -1,4 +1,4 @@
-import client from '../../api/client';
+import { supabase } from '../../../lib/supabase';
 import { User } from './postService';
 import reelCacheService from './reelCacheService';
 
@@ -16,40 +16,6 @@ export type Reel = {
   commentCount?: number;
   shareCount?: number;
   comments?: ReelComment[];
-};
-
-// Helper function to get the media URL from a reel
-export const getReelMediaUrl = (reel: Reel): string => {
-  let url = reel.mediaUrl || reel.videoUrl || '';
-  
-  // Fix common Cloudinary URL issues
-  if (url.includes('cloudinary.com')) {
-    // Ensure HTTPS is used
-    if (url.startsWith('http://')) {
-      url = url.replace('http://', 'https://');
-    }
-    
-    // Add optimization parameters for better loading
-    if (url.includes('/upload/') && !url.includes('/upload/f_auto,q_auto/')) {
-      url = url.replace('/upload/', '/upload/f_auto,q_auto/');
-    }
-    
-    // Add optimization parameters for video URLs (without invalid timeout parameter)
-    if (url.match(/\.(mp4|mov|avi|wmv|flv|webm|mkv)$/i)) {
-      // Use quality optimization instead of timeout
-      if (!url.includes('q_auto')) {
-        url = url.replace('/upload/', '/upload/q_auto/');
-      }
-    }
-  }
-  
-  return url;
-};
-
-// Helper function to check if a reel has valid media
-export const hasValidMedia = (reel: Reel): boolean => {
-  const mediaUrl = getReelMediaUrl(reel);
-  return Boolean(mediaUrl && mediaUrl.startsWith('http'));
 };
 
 export type ReelComment = {
@@ -72,15 +38,44 @@ export const fetchReels = async (forceRefresh: boolean = false): Promise<Reel[]>
       }
     }
 
-    console.log('Fetching reels from backend...');
-    const res = await client.get('/reels');
-    console.log('Reels response:', res.data);
-    console.log('Number of reels received:', res.data.length);
+    console.log('Fetching reels from Supabase...');
+    const { data, error } = await supabase
+      .from('reels')
+      .select(`
+        *,
+        user:user_id (
+          id,
+          username,
+          profile_image_url
+        )
+      `)
+      .order('created_at', { ascending: false });
+
+    if (error) throw error;
+
+    console.log('Reels response:', data);
+    console.log('Number of reels received:', data?.length || 0);
+    
+    // Transform data to match expected format
+    const transformedReels = data?.map(reel => ({
+      id: reel.id,
+      userId: reel.user_id,
+      username: reel.user?.username || 'Unknown',
+      profilePicture: reel.user?.profile_image_url,
+      mediaUrl: reel.media_url,
+      videoUrl: reel.media_url, // For backward compatibility
+      caption: reel.caption,
+      createdAt: reel.created_at,
+      likedBy: reel.liked_by || [],
+      likeCount: reel.like_count || 0,
+      commentCount: reel.comment_count || 0,
+      shareCount: reel.share_count || 0
+    })) || [];
     
     // Cache the fetched reels
-    await reelCacheService.cacheReels(res.data);
+    await reelCacheService.cacheReels(transformedReels);
     
-    return res.data;
+    return transformedReels;
   } catch (error) {
     console.error('Error fetching reels:', error);
     
@@ -100,65 +95,213 @@ export const fetchReels = async (forceRefresh: boolean = false): Promise<Reel[]>
   }
 };
 
-export const createReel = async (reel: { mediaUrl: string; caption?: string }, userId: string) => {
+export const createReel = async (reel: { mediaUrl: string; caption?: string }, userId: string): Promise<Reel> => {
   try {
-    console.log('Creating reel with data:', { ...reel, userId });
-    const res = await client.post(`/reels/create`, { ...reel, userId });
-    console.log('Reel created successfully:', res.data);
-    return res.data;
+    const { data, error } = await supabase
+      .from('reels')
+      .insert({
+        user_id: userId,
+        media_url: reel.mediaUrl,
+        caption: reel.caption,
+        like_count: 0,
+        comment_count: 0,
+        share_count: 0,
+        liked_by: []
+      })
+      .select(`
+        *,
+        user:user_id (
+          id,
+          username,
+          profile_image_url
+        )
+      `)
+      .single();
+
+    if (error) throw error;
+
+    // Transform to match expected format
+    return {
+      id: data.id,
+      userId: data.user_id,
+      username: data.user?.username || 'Unknown',
+      profilePicture: data.user?.profile_image_url,
+      mediaUrl: data.media_url,
+      videoUrl: data.media_url,
+      caption: data.caption,
+      createdAt: data.created_at,
+      likedBy: data.liked_by || [],
+      likeCount: data.like_count || 0,
+      commentCount: data.comment_count || 0,
+      shareCount: data.share_count || 0
+    };
   } catch (error) {
     console.error('Error creating reel:', error);
     throw error;
   }
 };
 
-export const deleteReel = async (reelId: string, userId: string) => {
-  const res = await client.delete(`/reels/${reelId}?userId=${userId}`);
-  return res.data;
+export const likeReel = async (reelId: string, userId: string): Promise<void> => {
+  try {
+    // Get current reel data
+    const { data: reel, error: fetchError } = await supabase
+      .from('reels')
+      .select('liked_by, like_count')
+      .eq('id', reelId)
+      .single();
+
+    if (fetchError) throw fetchError;
+
+    const likedBy = reel.liked_by || [];
+    const isLiked = likedBy.includes(userId);
+
+    if (isLiked) {
+      // Unlike: remove user from liked_by array and decrement count
+      const newLikedBy = likedBy.filter(id => id !== userId);
+      const newLikeCount = Math.max(0, (reel.like_count || 0) - 1);
+
+      const { error } = await supabase
+        .from('reels')
+        .update({
+          liked_by: newLikedBy,
+          like_count: newLikeCount
+        })
+        .eq('id', reelId);
+
+      if (error) throw error;
+    } else {
+      // Like: add user to liked_by array and increment count
+      const newLikedBy = [...likedBy, userId];
+      const newLikeCount = (reel.like_count || 0) + 1;
+
+      const { error } = await supabase
+        .from('reels')
+        .update({
+          liked_by: newLikedBy,
+          like_count: newLikeCount
+        })
+        .eq('id', reelId);
+
+      if (error) throw error;
+    }
+  } catch (error) {
+    console.error('Error liking reel:', error);
+    throw error;
+  }
 };
 
-export const likeReel = async (reelId: string, userId: string) => {
-  const res = await client.post(`/reels/${reelId}/like?userId=${userId}`);
-  return res.data;
-};
+export const addReelComment = async (reelId: string, userId: string, text: string): Promise<ReelComment> => {
+  try {
+    const { data, error } = await supabase
+      .from('reel_comments')
+      .insert({
+        reel_id: reelId,
+        user_id: userId,
+        text: text
+      })
+      .select(`
+        *,
+        user:user_id (
+          id,
+          username,
+          profile_image_url
+        )
+      `)
+      .single();
 
-export const unlikeReel = async (reelId: string, userId: string) => {
-  const res = await client.post(`/reels/${reelId}/unlike?userId=${userId}`);
-  return res.data;
-};
+    if (error) throw error;
 
-export const addReelComment = async (reelId: string, userId: string, text: string) => {
-  const res = await client.post(`/reels/${reelId}/comment?userId=${userId}`, text);
-  return res.data;
+    // Update comment count on reel
+    const { error: updateError } = await supabase.rpc('increment_reel_comments', {
+      reel_id: reelId
+    });
+
+    if (updateError) {
+      console.warn('Failed to update comment count:', updateError);
+    }
+
+    return {
+      id: data.id,
+      userId: data.user_id,
+      username: data.user?.username || 'Unknown',
+      profilePicture: data.user?.profile_image_url,
+      text: data.text,
+      createdAt: data.created_at
+    };
+  } catch (error) {
+    console.error('Error adding reel comment:', error);
+    throw error;
+  }
 };
 
 export const getReelComments = async (reelId: string): Promise<ReelComment[]> => {
-  const res = await client.get(`/reels/${reelId}/comments`);
-  return res.data;
-};
-
-export const shareReel = async (reelId: string) => {
-  const res = await client.post(`/reels/${reelId}/share`);
-  return res.data;
-};
-
-// Helper function to test if a Cloudinary URL is accessible
-export const testCloudinaryUrl = async (url: string): Promise<boolean> => {
   try {
-    if (!url.includes('cloudinary.com')) {
-      return true; // Not a Cloudinary URL, assume it's accessible
-    }
-    
-    const response = await fetch(url, { 
-      method: 'HEAD',
-      headers: {
-        'User-Agent': 'MasChat/1.0',
-      }
-    });
-    
-    return response.ok;
+    const { data, error } = await supabase
+      .from('reel_comments')
+      .select(`
+        *,
+        user:user_id (
+          id,
+          username,
+          profile_image_url
+        )
+      `)
+      .eq('reel_id', reelId)
+      .order('created_at', { ascending: false });
+
+    if (error) throw error;
+
+    return data?.map(comment => ({
+      id: comment.id,
+      userId: comment.user_id,
+      username: comment.user?.username || 'Unknown',
+      profilePicture: comment.user?.profile_image_url,
+      text: comment.text,
+      createdAt: comment.created_at
+    })) || [];
   } catch (error) {
-    console.error('Error testing Cloudinary URL:', url, error);
-    return false;
+    console.error('Error fetching reel comments:', error);
+    throw error;
   }
-}; 
+};
+
+export const shareReel = async (reelId: string): Promise<void> => {
+  try {
+    const { error } = await supabase.rpc('increment_reel_shares', {
+      reel_id: reelId
+    });
+
+    if (error) throw error;
+  } catch (error) {
+    console.error('Error sharing reel:', error);
+    throw error;
+  }
+};
+
+export const deleteReel = async (reelId: string, userId: string): Promise<void> => {
+  try {
+    // First check if user owns the reel
+    const { data: reel, error: fetchError } = await supabase
+      .from('reels')
+      .select('user_id')
+      .eq('id', reelId)
+      .single();
+
+    if (fetchError) throw fetchError;
+
+    if (reel.user_id !== userId) {
+      throw new Error('Unauthorized: You can only delete your own reels');
+    }
+
+    // Delete the reel (cascade will handle comments)
+    const { error } = await supabase
+      .from('reels')
+      .delete()
+      .eq('id', reelId);
+
+    if (error) throw error;
+  } catch (error) {
+    console.error('Error deleting reel:', error);
+    throw error;
+  }
+};

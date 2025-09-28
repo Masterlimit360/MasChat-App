@@ -1,4 +1,4 @@
-import client from '../../api/client';
+import { supabase } from '../../../lib/supabase';
 
 export type MarketplaceCategory = {
   id: number;
@@ -32,46 +32,47 @@ export interface MarketplaceOrder {
   buyerId: string;
   sellerId: string;
   quantity: number;
-  totalAmount: number;
-  shippingAddress: string;
-  phoneNumber: string;
-  paymentMethod: string;
+  totalPrice: number;
   status: string;
   createdAt: string;
-  price?: number;
-  deliveryMethod?: string;
-  fee?: number;
-  updatedAt?: string;
+  updatedAt: string;
+  item?: MarketplaceItem;
 }
 
-export type MarketplaceReview = {
+export interface MarketplaceBusinessAccount {
   id: number;
-  item: MarketplaceItem;
-  reviewer: any;
-  rating: number;
-  comment: string;
-  createdAt: string;
-};
-
-export type MarketplaceBusinessAccount = {
-  id: number;
-  user: any;
+  userId: string;
   businessName: string;
+  businessType: string;
   description: string;
   logo: string;
   contactInfo: string;
-};
+}
 
 export const marketplaceService = {
   // Get all items
   async getItems(): Promise<MarketplaceItem[]> {
     try {
-      console.log('=== FRONTEND: Fetching marketplace items ===');
-      const response = await client.get('/marketplace/items');
-      console.log('=== FRONTEND: Received response:', response.status, response.data?.length || 0, 'items');
+      console.log('=== FRONTEND: Fetching marketplace items from Supabase ===');
+      const { data, error } = await supabase
+        .from('marketplace_items')
+        .select(`
+          *,
+          seller:user_id (
+            id,
+            username,
+            full_name,
+            profile_image_url
+          )
+        `)
+        .order('created_at', { ascending: false });
 
-      if (response.data && Array.isArray(response.data)) {
-        response.data.forEach((item, index) => {
+      if (error) throw error;
+
+      console.log('=== FRONTEND: Received response:', data?.length || 0, 'items');
+
+      if (data && Array.isArray(data)) {
+        data.forEach((item, index) => {
           console.log(`Item ${index}:`, {
             id: item.id,
             title: item.title,
@@ -80,14 +81,10 @@ export const marketplaceService = {
         });
       }
 
-      return response.data;
+      return data || [];
     } catch (error: any) {
       console.error('=== FRONTEND ERROR: Failed to fetch marketplace items ===');
       console.error('Error details:', error);
-      if (error.response) {
-        console.error('Response status:', error.response.status);
-        console.error('Response data:', error.response.data);
-      }
       
       // Show user-friendly error
       throw new Error('Failed to load marketplace items. Please try again.');
@@ -97,8 +94,22 @@ export const marketplaceService = {
   // Get item by ID
   async getItem(id: number): Promise<MarketplaceItem> {
     try {
-      const response = await client.get(`/marketplace/items/${id}`);
-      return response.data;
+      const { data, error } = await supabase
+        .from('marketplace_items')
+        .select(`
+          *,
+          seller:user_id (
+            id,
+            username,
+            full_name,
+            profile_image_url
+          )
+        `)
+        .eq('id', id)
+        .single();
+
+      if (error) throw error;
+      return data;
     } catch (error) {
       console.error('Error fetching item:', error);
       throw error;
@@ -108,152 +119,317 @@ export const marketplaceService = {
   // Get categories
   async getCategories(): Promise<MarketplaceCategory[]> {
     try {
-      const response = await client.get('/marketplace/categories');
-      return response.data;
+      const { data, error } = await supabase
+        .from('marketplace_categories')
+        .select('*')
+        .order('name');
+
+      if (error) throw error;
+      return data || [];
     } catch (error) {
       console.error('Error fetching categories:', error);
-      return [];
+      throw error;
+    }
+  },
+
+  // Create item
+  async createItem(item: Omit<MarketplaceItem, 'id' | 'seller'>): Promise<MarketplaceItem> {
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) throw new Error('User not authenticated');
+
+      const { data, error } = await supabase
+        .from('marketplace_items')
+        .insert({
+          title: item.title,
+          description: item.description,
+          price: item.price,
+          negotiable: item.negotiable,
+          category_id: item.category.id,
+          condition: item.condition,
+          images: item.images,
+          delivery_method: item.deliveryMethod,
+          location: item.location,
+          status: item.status,
+          user_id: user.id
+        })
+        .select(`
+          *,
+          seller:user_id (
+            id,
+            username,
+            full_name,
+            profile_image_url
+          )
+        `)
+        .single();
+
+      if (error) throw error;
+      return data;
+    } catch (error) {
+      console.error('Error creating item:', error);
+      throw error;
+    }
+  },
+
+  // Update item
+  async updateItem(id: number, updates: Partial<MarketplaceItem>): Promise<MarketplaceItem> {
+    try {
+      const { data, error } = await supabase
+        .from('marketplace_items')
+        .update({
+          title: updates.title,
+          description: updates.description,
+          price: updates.price,
+          negotiable: updates.negotiable,
+          condition: updates.condition,
+          images: updates.images,
+          delivery_method: updates.deliveryMethod,
+          location: updates.location,
+          status: updates.status
+        })
+        .eq('id', id)
+        .select(`
+          *,
+          seller:user_id (
+            id,
+            username,
+            full_name,
+            profile_image_url
+          )
+        `)
+        .single();
+
+      if (error) throw error;
+      return data;
+    } catch (error) {
+      console.error('Error updating item:', error);
+      throw error;
+    }
+  },
+
+  // Delete item
+  async deleteItem(id: number): Promise<void> {
+    try {
+      const { error } = await supabase
+        .from('marketplace_items')
+        .delete()
+        .eq('id', id);
+
+      if (error) throw error;
+    } catch (error) {
+      console.error('Error deleting item:', error);
+      throw error;
+    }
+  },
+
+  // Get user's items
+  async getUserItems(userId: string): Promise<MarketplaceItem[]> {
+    try {
+      const { data, error } = await supabase
+        .from('marketplace_items')
+        .select(`
+          *,
+          seller:user_id (
+            id,
+            username,
+            full_name,
+            profile_image_url
+          )
+        `)
+        .eq('user_id', userId)
+        .order('created_at', { ascending: false });
+
+      if (error) throw error;
+      return data || [];
+    } catch (error) {
+      console.error('Error fetching user items:', error);
+      throw error;
     }
   },
 
   // Search items
-  async searchItems(query: string): Promise<MarketplaceItem[]> {
+  async searchItems(query: string, categoryId?: number): Promise<MarketplaceItem[]> {
     try {
-      const response = await client.get(`/marketplace/items/search?q=${encodeURIComponent(query)}`);
-      return response.data;
+      let queryBuilder = supabase
+        .from('marketplace_items')
+        .select(`
+          *,
+          seller:user_id (
+            id,
+            username,
+            full_name,
+            profile_image_url
+          )
+        `)
+        .or(`title.ilike.%${query}%,description.ilike.%${query}%`);
+
+      if (categoryId) {
+        queryBuilder = queryBuilder.eq('category_id', categoryId);
+      }
+
+      const { data, error } = await queryBuilder.order('created_at', { ascending: false });
+
+      if (error) throw error;
+      return data || [];
     } catch (error) {
       console.error('Error searching items:', error);
-      return [];
-    }
-  },
-
-  // Get items by category
-  async getItemsByCategory(categoryId: number): Promise<MarketplaceItem[]> {
-    try {
-      const response = await client.get(`/marketplace/items/category/${categoryId}`);
-      return response.data;
-    } catch (error) {
-      console.error('Error fetching items by category:', error);
-      return [];
-    }
-  },
-
-  // Create new marketplace item
-  async createItem(itemData: {
-    title: string;
-    description: string;
-    price: number;
-    negotiable: boolean;
-    condition: string;
-    deliveryMethod: string;
-    location: string;
-    images: string[];
-    sellerId: string;
-    categoryId?: number;
-    status?: string;
-  }): Promise<MarketplaceItem> {
-    try {
-      const response = await client.post('/marketplace/items/create-with-seller', itemData);
-      return response.data;
-    } catch (error: any) {
-      console.error('Error creating marketplace item:', error);
-      throw new Error('Failed to create marketplace item. Please try again.');
+      throw error;
     }
   },
 
   // Create order
-  async createOrder(orderData: {
-    itemId: number;
-    buyerId: string;
-    sellerId: string;
-    quantity: number;
-    totalAmount: number;
-    shippingAddress: string;
-    phoneNumber: string;
-    paymentMethod: string;
-    status: string;
-  }): Promise<MarketplaceOrder> {
+  async createOrder(order: Omit<MarketplaceOrder, 'id' | 'createdAt' | 'updatedAt'>): Promise<MarketplaceOrder> {
     try {
-      const response = await client.post('/marketplace/orders', orderData);
-      return response.data;
+      const { data, error } = await supabase
+        .from('marketplace_orders')
+        .insert({
+          item_id: order.itemId,
+          buyer_id: order.buyerId,
+          seller_id: order.sellerId,
+          quantity: order.quantity,
+          total_price: order.totalPrice,
+          status: order.status
+        })
+        .select(`
+          *,
+          item:item_id (
+            *,
+            seller:user_id (
+              id,
+              username,
+              full_name,
+              profile_image_url
+            )
+          )
+        `)
+        .single();
+
+      if (error) throw error;
+      return data;
     } catch (error) {
       console.error('Error creating order:', error);
       throw error;
     }
   },
 
-  // Update item status
-  async updateItemStatus(itemId: number, status: string): Promise<void> {
-    try {
-      await client.patch(`/marketplace/items/${itemId}/status`, { status });
-    } catch (error) {
-      console.error('Error updating item status:', error);
-      throw error;
-    }
-  },
-
-  // Notify seller
-  async notifySeller(sellerId: string, orderId: number): Promise<void> {
-    try {
-      await client.post('/marketplace/notifications/seller', {
-        sellerId,
-        orderId,
-        type: 'new_order'
-      });
-    } catch (error) {
-      console.error('Error notifying seller:', error);
-      // Don't throw error as this is not critical
-    }
-  },
-
   // Get user orders
   async getUserOrders(userId: string): Promise<MarketplaceOrder[]> {
     try {
-      const response = await client.get(`/marketplace/orders/user/${userId}`);
-      return response.data;
+      const { data, error } = await supabase
+        .from('marketplace_orders')
+        .select(`
+          *,
+          item:item_id (
+            *,
+            seller:user_id (
+              id,
+              username,
+              full_name,
+              profile_image_url
+            )
+          )
+        `)
+        .or(`buyer_id.eq.${userId},seller_id.eq.${userId}`)
+        .order('created_at', { ascending: false });
+
+      if (error) throw error;
+      return data || [];
     } catch (error) {
       console.error('Error fetching user orders:', error);
-      return [];
-    }
-  },
-
-  // Get order details
-  async getOrderDetails(orderId: number): Promise<MarketplaceOrder> {
-    try {
-      const response = await client.get(`/marketplace/orders/${orderId}`);
-      return response.data;
-    } catch (error) {
-      console.error('Error fetching order details:', error);
       throw error;
     }
   },
 
   // Update order status
-  async updateOrderStatus(orderId: number, status: string): Promise<void> {
+  async updateOrderStatus(orderId: number, status: string): Promise<MarketplaceOrder> {
     try {
-      await client.patch(`/marketplace/orders/${orderId}/status`, { status });
+      const { data, error } = await supabase
+        .from('marketplace_orders')
+        .update({ status })
+        .eq('id', orderId)
+        .select(`
+          *,
+          item:item_id (
+            *,
+            seller:user_id (
+              id,
+              username,
+              full_name,
+              profile_image_url
+            )
+          )
+        `)
+        .single();
+
+      if (error) throw error;
+      return data;
     } catch (error) {
       console.error('Error updating order status:', error);
       throw error;
     }
   },
 
-  async getReviews(itemId: number) {
-    const res = await client.get(`/marketplace/reviews/item/${itemId}`);
-    return res.data;
+  // Business account operations
+  async createBusinessAccount(account: Omit<MarketplaceBusinessAccount, 'id'>): Promise<MarketplaceBusinessAccount> {
+    try {
+      const { data, error } = await supabase
+        .from('marketplace_business_accounts')
+        .insert({
+          user_id: account.userId,
+          business_name: account.businessName,
+          business_type: account.businessType,
+          description: account.description,
+          logo: account.logo,
+          contact_info: account.contactInfo
+        })
+        .select()
+        .single();
+
+      if (error) throw error;
+      return data;
+    } catch (error) {
+      console.error('Error creating business account:', error);
+      throw error;
+    }
   },
-  async createReview(review: Partial<MarketplaceReview>) {
-    const res = await client.post('/marketplace/reviews', review);
-    return res.data;
+
+  async getBusinessAccount(userId: string): Promise<MarketplaceBusinessAccount | null> {
+    try {
+      const { data, error } = await supabase
+        .from('marketplace_business_accounts')
+        .select('*')
+        .eq('user_id', userId)
+        .single();
+
+      if (error && error.code !== 'PGRST116') throw error;
+      return data;
+    } catch (error) {
+      console.error('Error fetching business account:', error);
+      throw error;
+    }
   },
-  async getBusinessAccount(userId: number) {
-    const res = await client.get(`/marketplace/business-accounts/user/${userId}`);
-    return res.data;
-  },
-  async createBusinessAccount(account: Partial<MarketplaceBusinessAccount>) {
-    const res = await client.post('/marketplace/business-accounts', account);
-    return res.data;
+
+  async updateBusinessAccount(userId: string, updates: Partial<MarketplaceBusinessAccount>): Promise<MarketplaceBusinessAccount> {
+    try {
+      const { data, error } = await supabase
+        .from('marketplace_business_accounts')
+        .update({
+          business_name: updates.businessName,
+          business_type: updates.businessType,
+          description: updates.description,
+          logo: updates.logo,
+          contact_info: updates.contactInfo
+        })
+        .eq('user_id', userId)
+        .select()
+        .single();
+
+      if (error) throw error;
+      return data;
+    } catch (error) {
+      console.error('Error updating business account:', error);
+      throw error;
+    }
   },
 };
-
-export default marketplaceService; 

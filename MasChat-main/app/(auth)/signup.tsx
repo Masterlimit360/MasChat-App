@@ -7,7 +7,7 @@ import { Image, StatusBar, StyleSheet, Text, TextInput, TouchableOpacity, View, 
 import * as Animatable from 'react-native-animatable';
 import Toast from 'react-native-toast-message';
 import { useAuth } from '../context/AuthContext';
-import client, { BASE_URL, testConnection } from '../api/client';
+import { supabase } from '../../lib/supabase';
 
 // Color Palette (matching home screen)
 type ColorScheme = {
@@ -120,86 +120,121 @@ export default function Signup() {
   const handleSignup = async () => {
     if (!validateForm()) return;
 
-    const isConnected = await testConnection();
-    if (!isConnected) {
-      Toast.show({
-        type: 'error',
-        text1: 'Connection Failed',
-        text2: 'Cannot reach server. Check your network and server IP.',
-        position: 'top',
-        visibilityTime: 4000,
-        topOffset: 60,
-      });
-      return;
-    }
-
     setLoading(true);
     try {
-      const response = await client.post(
-        `/auth/register`,
-        { 
-          username: username.trim(), 
-          email: email.trim(), 
-          password,
-          fullName: fullName.trim() || null 
-        },
-        { 
-          headers: { 'Content-Type': 'application/json' }, 
-          timeout: 10000 
+      // Check if user is already authenticated (came from login flow)
+      const { data: { session } } = await supabase.auth.getSession();
+      
+      if (session?.user) {
+        // User is already authenticated, just create the profile
+        console.log('User already authenticated, creating profile...');
+        
+        const { error: profileError } = await supabase
+          .from('users')
+          .insert({
+            id: session.user.id,
+            username: username.trim(),
+            email: email.trim(),
+            password_hash: '', // Supabase handles password hashing
+            full_name: fullName.trim() || null,
+            mass_coin_balance: 1000.00
+          });
+
+        if (profileError) {
+          console.error('Profile creation error:', profileError);
+          
+          Toast.show({
+            type: 'error',
+            text1: 'Profile Creation Failed',
+            text2: 'Failed to create user profile. Please try again.',
+            position: 'top',
+            visibilityTime: 5000,
+            topOffset: 60,
+          });
+          return;
         }
-      );
 
-      if (response.data && response.data.token && response.data.userId) {
-        const { token, user, userId, username: responseUsername } = response.data;
-        
-        // Create user object with proper structure
-        const userObj = {
-          id: userId,
-          username: responseUsername || user?.username,
-          email: user?.email,
-          fullName: user?.fullName,
-          profilePicture: user?.profilePicture,
-          coverPhoto: user?.coverPhoto,
-          bio: user?.bio,
-          createdAt: user?.createdAt,
-          updatedAt: user?.updatedAt,
-          verified: user?.verified,
-          ...user // Include any additional fields
-        };
-
-        await signIn(token, userObj);
-        await AsyncStorage.setItem('userToken', token);
-        await AsyncStorage.setItem('user', JSON.stringify(userObj));
-        await AsyncStorage.setItem('username', userObj.username);
-        
         Toast.show({
           type: 'success',
-          text1: 'Signup Successful',
-          text2: 'Welcome to MasChat!',
+          text1: 'Profile Created',
+          text2: 'Welcome to MasChat! Your account is now complete.',
           position: 'top',
           visibilityTime: 3000,
           topOffset: 60,
         });
         
+        // Redirect to home page
         router.replace('/(tabs)/home');
-      } else {
-        throw new Error('Unexpected response format from server');
+        return;
+      }
+
+      // Normal signup flow
+      const { data, error } = await supabase.auth.signUp({
+        email: email.trim(),
+        password,
+        options: {
+          data: {
+            username: username.trim(),
+            full_name: fullName.trim() || null
+          }
+        }
+      });
+
+      if (error) throw error;
+
+      if (data.user) {
+        // Create user profile in our users table
+        // Use a small delay to ensure the user is properly authenticated
+        await new Promise(resolve => setTimeout(resolve, 1000));
+        
+        const { error: profileError } = await supabase
+          .from('users')
+          .insert({
+            id: data.user.id,
+            username: username.trim(),
+            email: email.trim(),
+            password_hash: '', // Supabase handles password hashing
+            full_name: fullName.trim() || null,
+            mass_coin_balance: 1000.00
+          });
+
+        if (profileError) {
+          console.error('Profile creation error:', profileError);
+          
+          Toast.show({
+            type: 'error',
+            text1: 'Signup Failed',
+            text2: 'Failed to create user profile. Please try again.',
+            position: 'top',
+            visibilityTime: 5000,
+            topOffset: 60,
+          });
+          return;
+        }
+
+        Toast.show({
+          type: 'success',
+          text1: 'Signup Successful',
+          text2: 'Welcome to MasChat! Please check your email to verify your account.',
+          position: 'top',
+          visibilityTime: 5000,
+          topOffset: 60,
+        });
+        
+        // Redirect to login page
+        router.replace('/(auth)/login');
       }
     } catch (error: any) {
       let errorMessage = 'Signup failed. Please try again.';
       
-      if (error.response) {
-        if (error.response.data?.error) {
-          errorMessage = error.response.data.error;
-        } else if (error.response.status === 400) {
-          errorMessage = 'Validation error. Please check your inputs.';
-        } else if (error.response.status === 409) {
-          errorMessage = 'Username or email already exists.';
+      if (error.message) {
+        if (error.message.includes('already registered')) {
+          errorMessage = 'Email already exists. Please use a different email.';
+        } else if (error.message.includes('weak password')) {
+          errorMessage = 'Password is too weak. Please choose a stronger password.';
+        } else {
+          errorMessage = error.message;
         }
-      } else if (error.request) {
-        errorMessage = 'No response from server. Please try again.';
-      } else {
-        errorMessage = 'Request setup error. Please try again.';
       }
       
       Toast.show({
@@ -214,19 +249,6 @@ export default function Signup() {
       setLoading(false);
     }
   };
-
-  const testConnection = async () => {
-    try {
-      const response = await client.get(`/auth/test`, { timeout: 3000 });
-      return response.status === 200;
-    } catch (error) {
-      return false;
-    }
-  };
-
-  useEffect(() => { 
-    testConnection(); 
-  }, []);
 
   return (
     <View style={[styles.container, { backgroundColor: colors.background }]}>

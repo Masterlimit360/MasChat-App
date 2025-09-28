@@ -1,7 +1,7 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { router } from 'expo-router';
 import React, { createContext, useContext, useEffect, useState } from 'react';
-import client, { BASE_URL } from '../api/client';
+import { supabase } from '../../lib/supabase';
 
 type UserDetails = {
   profileType?: string;
@@ -38,7 +38,7 @@ type AuthContextType = {
   user: User | null;
   token: string | null;
   isLoading: boolean;
-  signIn: (token: string, user: User) => Promise<void>;
+  signIn: (email: string, password: string) => Promise<void>;
   signOut: () => Promise<void>;
   updateUser: (updatedUser?: Partial<User>) => Promise<void>;
   refreshUser: () => Promise<void>;
@@ -54,80 +54,65 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     const loadAuthData = async () => {
       try {
-        const [storedToken, storedUser] = await Promise.all([
-          AsyncStorage.getItem('userToken'),
-          AsyncStorage.getItem('user'),
-        ]);
-        if (storedToken && storedUser) {
-          setToken(storedToken);
-          setUser(JSON.parse(storedUser));
+        // Check if user is already signed in with Supabase
+        const { data: { session }, error } = await supabase.auth.getSession();
+        
+        if (session?.user && !error) {
+          console.log('User already signed in with Supabase:', session.user.email);
           
-          // Set a flag to indicate we have stored credentials
-          const hasStoredCredentials = true;
+          // Get user profile from our users table
+          const { data: userProfile, error: profileError } = await supabase
+            .from('users')
+            .select('*')
+            .eq('id', session.user.id)
+            .maybeSingle();
           
-          // Validate token with backend
-          try {
-            console.log('Validating token with backend...');
-            console.log('Token:', storedToken.substring(0, 20) + '...');
+          if (userProfile && !profileError) {
+            const userData = {
+              id: userProfile.id,
+              username: userProfile.username,
+              email: userProfile.email,
+              fullName: userProfile.full_name,
+              profilePicture: userProfile.profile_image_url,
+              bio: userProfile.bio,
+              createdAt: userProfile.created_at,
+              updatedAt: userProfile.updated_at,
+            };
             
-            // First test if backend is reachable
-            try {
-              const testResponse = await client.get('/auth/test');
-              console.log('Backend test successful:', testResponse.data);
-            } catch (testError: any) {
-              console.log('Backend test failed:', testError.message);
-              // If backend is not reachable, don't clear the token - just skip validation
-              console.log('Backend not reachable, skipping token validation');
-              console.log('User will remain logged in with stored credentials');
-              // Still redirect to home screen since we have stored credentials
-              router.replace('/(tabs)/home');
-              return;
-            }
+            setUser(userData);
+            setToken(session.access_token);
             
-            // Test token generation first
-            try {
-              const tokenTestResponse = await client.get('/auth/test-token');
-              console.log('Token generation test:', tokenTestResponse.data);
-            } catch (tokenTestError: any) {
-              console.log('Token generation test failed:', tokenTestError.message);
-            }
+            // Store in AsyncStorage for persistence
+            await Promise.all([
+              AsyncStorage.setItem('userToken', session.access_token),
+              AsyncStorage.setItem('user', JSON.stringify(userData)),
+            ]);
             
-            const response = await client.get('/auth/validate-token', {
-              headers: { Authorization: `Bearer ${storedToken}` }
-            });
-            
-            if (response.status === 200) {
-              // Token is valid, user stays logged in
-              console.log('Token validated successfully:', response.data);
-              // Automatically redirect to home screen since token is valid
-              router.replace('/(tabs)/home');
-            } else {
-              // Token is invalid, clear storage and redirect to login
-              console.log('Token validation returned non-200 status:', response.status);
-              await signOut();
-            }
-          } catch (error: any) {
-            console.log('Token validation failed:', error);
-            console.log('Error details:', error.response?.data || error.message);
-            
-            // Only clear token if it's a 401 (unauthorized) error
-            if (error.response?.status === 401) {
-              console.log('Token is invalid (401), clearing storage');
-              console.log('Redirecting to login for fresh authentication');
-              // Clear the invalid token and redirect to login
-              await Promise.all([
-                AsyncStorage.removeItem('userToken'),
-                AsyncStorage.removeItem('user'),
-              ]);
-              setToken(null);
-              setUser(null);
-              router.replace('/(auth)/login');
-            } else {
-              console.log('Network or server error, keeping token for now');
-              console.log('User will remain logged in with stored credentials');
-              // Still redirect to home screen since we have stored credentials
-              router.replace('/(tabs)/home');
-            }
+            router.replace('/(tabs)/home');
+          } else if (profileError) {
+            console.log('User profile not found, redirecting to signup');
+            // Don't sign out, just redirect to signup to complete profile
+            router.replace('/(auth)/signup');
+          } else {
+            // User exists in auth but not in our users table
+            // This can happen if signup profile creation failed
+            console.log('User authenticated but profile not found, redirecting to signup');
+            router.replace('/(auth)/signup');
+          }
+        } else {
+          console.log('No active session, checking stored credentials...');
+          
+          // Check for stored credentials as fallback
+          const [storedToken, storedUser] = await Promise.all([
+            AsyncStorage.getItem('userToken'),
+            AsyncStorage.getItem('user'),
+          ]);
+          
+          if (storedToken && storedUser) {
+            console.log('Found stored credentials, validating...');
+            setToken(storedToken);
+            setUser(JSON.parse(storedUser));
+            router.replace('/(tabs)/home');
           }
         }
       } catch (error) {
@@ -144,16 +129,57 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     loadAuthData();
   }, []);
 
-  // Accepts the user object returned by your backend login endpoint
-  const signIn = async (newToken: string, backendUser: User) => {
+  // Supabase sign in method
+  const signIn = async (email: string, password: string) => {
     try {
-      await Promise.all([
-        AsyncStorage.setItem('userToken', newToken),
-        AsyncStorage.setItem('user', JSON.stringify(backendUser)),
-      ]);
-      setToken(newToken);
-      setUser(backendUser);
-      router.replace('/(tabs)/home');
+      const { data, error } = await supabase.auth.signInWithPassword({
+        email,
+        password
+      });
+      
+      if (error) throw error;
+      
+      if (data.user) {
+        // Get user profile from our users table
+        const { data: userProfile, error: profileError } = await supabase
+          .from('users')
+          .select('*')
+          .eq('id', data.user.id)
+          .maybeSingle();
+        
+        if (profileError) {
+          console.error('Profile error:', profileError);
+          // If profile doesn't exist, redirect to signup
+          router.replace('/(auth)/signup');
+          return;
+        }
+        
+        if (!userProfile) {
+          console.log('User profile not found, redirecting to signup');
+          router.replace('/(auth)/signup');
+          return;
+        }
+        
+        const userData = {
+          id: userProfile.id,
+          username: userProfile.username,
+          email: userProfile.email,
+          fullName: userProfile.full_name,
+          profilePicture: userProfile.profile_image_url,
+          bio: userProfile.bio,
+          createdAt: userProfile.created_at,
+          updatedAt: userProfile.updated_at,
+        };
+        
+        await Promise.all([
+          AsyncStorage.setItem('userToken', data.session.access_token),
+          AsyncStorage.setItem('user', JSON.stringify(userData)),
+        ]);
+        
+        setToken(data.session.access_token);
+        setUser(userData);
+        router.replace('/(tabs)/home');
+      }
     } catch (error) {
       console.error('Failed to sign in:', error);
       throw error;
@@ -162,10 +188,15 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   const signOut = async () => {
     try {
+      // Sign out from Supabase
+      await supabase.auth.signOut();
+      
+      // Clear local storage
       await Promise.all([
         AsyncStorage.removeItem('userToken'),
         AsyncStorage.removeItem('user'),
       ]);
+      
       setToken(null);
       setUser(null);
       router.replace('/(auth)/login');
@@ -178,10 +209,22 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const updateUser = async (updatedUser?: Partial<User>) => {
     try {
       if (!user) return;
-      let mergedUser = updatedUser ? { ...user, ...updatedUser } : user;
-      // Always fetch the latest user from backend after update
-      const response = await client.get(`/users/${user.id}`);
-      mergedUser = response.data;
+      
+      // Update user in Supabase
+      const { error } = await supabase
+        .from('users')
+        .update({
+          username: updatedUser?.username || user.username,
+          full_name: updatedUser?.fullName || user.fullName,
+          profile_image_url: updatedUser?.profilePicture || user.profilePicture,
+          bio: updatedUser?.bio || user.bio,
+        })
+        .eq('id', user.id);
+      
+      if (error) throw error;
+      
+      // Update local state
+      const mergedUser = { ...user, ...updatedUser };
       await AsyncStorage.setItem('user', JSON.stringify(mergedUser));
       setUser(mergedUser);
     } catch (error) {
@@ -190,12 +233,34 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
   };
 
-  // Always fetches the latest user from backend and updates context/storage
+  // Always fetches the latest user from Supabase and updates context/storage
   const refreshUser = async () => {
     try {
-      if (!token || !user?.id) return;
-      const response = await client.get(`/users/${user.id}`);
-      const userData = response.data;
+      if (!user?.id) return;
+      
+      const { data: userProfile, error } = await supabase
+        .from('users')
+        .select('*')
+        .eq('id', user.id)
+        .maybeSingle();
+      
+      if (error) throw error;
+      
+      if (!userProfile) {
+        throw new Error('User profile not found');
+      }
+      
+      const userData = {
+        id: userProfile.id,
+        username: userProfile.username,
+        email: userProfile.email,
+        fullName: userProfile.full_name,
+        profilePicture: userProfile.profile_image_url,
+        bio: userProfile.bio,
+        createdAt: userProfile.created_at,
+        updatedAt: userProfile.updated_at,
+      };
+      
       await AsyncStorage.setItem('user', JSON.stringify(userData));
       setUser(userData);
     } catch (error) {

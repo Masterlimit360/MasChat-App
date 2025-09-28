@@ -1,4 +1,4 @@
-import client, { BASE_URL } from '../../api/client';
+import { supabase } from '../../../lib/supabase';
 import { Post } from './postService';
 import { uploadImageToCloudinary } from './cloudinaryService';
 
@@ -225,31 +225,80 @@ export type Friend = {
 
 export async function getUserFriends(userId: string): Promise<Friend[]> {
   try {
-    const response = await client.get(`/friends/list/${userId}`);
-    return response.data;
+    const { data, error } = await supabase
+      .from('friends')
+      .select(`
+        friend:friend_id (
+          id,
+          username,
+          full_name,
+          profile_image_url
+        )
+      `)
+      .eq('user_id', userId)
+      .eq('status', 'accepted');
+
+    if (error) throw error;
+
+    return data?.map(friend => ({
+      id: friend.friend.id,
+      username: friend.friend.username,
+      fullName: friend.friend.full_name,
+      profilePicture: friend.friend.profile_image_url
+    })) || [];
   } catch (error: any) {
-    console.error('Error fetching user friends:', error.response?.data || error.message);
-    throw error;
+    console.error('Error fetching user friends:', error);
+    return [];
   }
 }
 
 export async function getUserPosts(userId: string): Promise<Post[]> {
   try {
-    const response = await client.get(`/posts/user/${userId}`);
-    return response.data;
+    const { data, error } = await supabase
+      .from('posts')
+      .select(`
+        *,
+        user:user_id (
+          id,
+          username,
+          full_name,
+          profile_image_url
+        )
+      `)
+      .eq('user_id', userId)
+      .order('created_at', { ascending: false });
+
+    if (error) throw error;
+
+    return data?.map(post => ({
+      id: post.id,
+      content: post.content,
+      imageUrl: post.image_url,
+      userId: post.user_id,
+      username: post.user?.username || 'Unknown',
+      userFullName: post.user?.full_name,
+      userProfilePicture: post.user?.profile_image_url,
+      createdAt: post.created_at,
+      likeCount: post.like_count || 0,
+      commentCount: post.comment_count || 0,
+      shareCount: post.share_count || 0,
+      likedBy: post.liked_by || []
+    })) || [];
   } catch (error: any) {
-    console.error('Error fetching user posts:', error.response?.data || error.message);
-    throw error;
+    console.error('Error fetching user posts:', error);
+    return [];
   }
 }
 
 export async function getBestFriends(userId: string): Promise<Friend[]> {
   try {
-    const response = await client.get(`/users/${userId}/best-friends`);
-    return response.data;
+    // For now, return the same as getUserFriends
+    // In the future, you can implement a more sophisticated algorithm
+    const friends = await getUserFriends(userId);
+    return friends.slice(0, 5); // Return first 5 friends as "best friends"
   } catch (error: any) {
-    console.error('Error fetching best friends:', error.response?.data || error.message);
-    throw error;
+    console.error('Error fetching best friends:', error);
+    return [];
   }
 }
 

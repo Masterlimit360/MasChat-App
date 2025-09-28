@@ -12,7 +12,7 @@ import CommentDialog from "../components/CommentDialog";
 import MenuModal from '../components/MenuModal';
 import MassCoinTipButton from '../../components/MassCoinTipButton';
 import { Colors } from '../../constants/Colors';
-import client from '../api/client';
+import { supabase } from '../../lib/supabase';
 
 const COLORS = {
   light: {
@@ -128,8 +128,13 @@ export default function Videos() {
   const testReelsEndpoint = async () => {
     try {
       console.log('Testing reels endpoint...');
-      const response = await client.get('/reels/test');
-      console.log('Test endpoint response:', response.data);
+      const { data, error } = await supabase
+        .from('reels')
+        .select('count')
+        .limit(1);
+      
+      if (error) throw error;
+      console.log('Test endpoint response:', data);
     } catch (error) {
       console.error('Test endpoint error:', error);
     }

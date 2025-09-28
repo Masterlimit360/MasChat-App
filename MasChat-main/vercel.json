@@ -1,0 +1,36 @@
+{
+  "buildCommand": "npx expo export --platform web",
+  "outputDirectory": "dist",
+  "framework": null,
+  "installCommand": "npm install",
+  "devCommand": "npx expo start --web",
+  "env": {
+    "EXPO_PUBLIC_SUPABASE_URL": "https://htgchjzullqxkegmtiff.supabase.co",
+    "EXPO_PUBLIC_SUPABASE_ANON_KEY": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imh0Z2Noanp1bGxxeGtlZ210aWZmIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTkwMTczMTAsImV4cCI6MjA3NDU5MzMxMH0.fKs39s2lnsBM7PfA8fUsUbxqDLQXIPvz6q5nXCtdVTg"
+  },
+  "headers": [
+    {
+      "source": "/(.*)",
+      "headers": [
+        {
+          "key": "X-Content-Type-Options",
+          "value": "nosniff"
+        },
+        {
+          "key": "X-Frame-Options",
+          "value": "DENY"
+        },
+        {
+          "key": "X-XSS-Protection",
+          "value": "1; mode=block"
+        }
+      ]
+    }
+  ],
+  "rewrites": [
+    {
+      "source": "/(.*)",
+      "destination": "/index.html"
+    }
+  ]
+}
